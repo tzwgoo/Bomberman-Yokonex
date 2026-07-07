@@ -1,0 +1,13 @@
+{
+  "name": "bomberman-yokonex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Yokonex Bomberman prototype based on Phaser and Colyseus.",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev:server": "npm --prefix server start",
+    "dev:client": "npm --prefix client start",
+    "build": "npm --prefix server run build && npm --prefix client run build"
+  },
+  "license": "UNLICENSED"
+}
