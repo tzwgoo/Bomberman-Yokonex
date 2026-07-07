@@ -1,7 +1,7 @@
 import { Client, Room } from "colyseus";
 import { MapSchema, Schema, type } from "@colyseus/schema";
 
-import { DEFAULT_BOMBERMAN_MAP_ID, findBombermanMap, type BombermanMapDefinition } from "./BombermanMaps";
+import { DEFAULT_BOMBERMAN_MAP_ID, resolveBombermanMap, type BombermanMapDefinition } from "./BombermanMaps";
 
 export interface BombermanInput {
   left: boolean;
@@ -16,9 +16,20 @@ export interface BombermanJoinOptions {
   nickname?: string;
   privateRoom?: boolean;
   mapId?: string;
+  password?: string;
+  maxClients?: number;
+  color?: string;
+  roleId?: string;
 }
 
 type PowerUpType = "bomb" | "range" | "speed" | "shield";
+
+type PlayerRolePreset = {
+  id: string;
+  title: string;
+  avatar: string;
+  skinId: string;
+};
 
 const POWER_UP_LABELS: Record<PowerUpType, string> = {
   bomb: "炸弹容量",
@@ -27,12 +38,25 @@ const POWER_UP_LABELS: Record<PowerUpType, string> = {
   shield: "能量护盾",
 };
 
+const PLAYER_ROLES: PlayerRolePreset[] = [
+  { id: "rookie", title: "新晋爆破手", avatar: "🙂", skinId: "rookie" },
+  { id: "blazer", title: "火花队长", avatar: "🔥", skinId: "blazer" },
+  { id: "bolt", title: "闪电游侠", avatar: "⚡", skinId: "bolt" },
+  { id: "guard", title: "护盾卫士", avatar: "🛡️", skinId: "guard" },
+];
+
+const DEFAULT_PLAYER_ROLE = PLAYER_ROLES[0];
+
 export class BombermanPlayer extends Schema {
   @type("number") x = 0;
   @type("number") y = 0;
   @type("number") tick = 0;
   @type("string") color = "#f6c453";
   @type("string") nickname = "玩家";
+  @type("string") roleId = DEFAULT_PLAYER_ROLE.id;
+  @type("string") title = DEFAULT_PLAYER_ROLE.title;
+  @type("string") avatar = DEFAULT_PLAYER_ROLE.avatar;
+  @type("string") skinId = DEFAULT_PLAYER_ROLE.skinId;
   @type("boolean") alive = true;
   @type("boolean") ready = false;
   @type("boolean") isHost = false;
@@ -85,13 +109,21 @@ export class BombermanState extends Schema {
   @type("number") offsetY = 36;
   @type("string") mapId = DEFAULT_BOMBERMAN_MAP_ID;
   @type("string") mapName = "经典工厂";
+  @type("string") mapDescription = "标准箱子密度，适合快速上手。";
+  @type("string") mapDifficulty = "普通";
+  @type("string") mapRecommendedPlayers = "2-4";
+  @type("string") mapPreview = "";
   @type("string") phase = "lobby";
   @type("string") roundStatus = "playing";
   @type("string") matchStatus = "playing";
+  @type("number") countdownMs = 0;
+  @type("number") maxPlayers = 4;
+  @type("boolean") hasPassword = false;
   @type("string") winnerSessionId = "";
   @type("string") matchWinnerSessionId = "";
   @type("number") roundNumber = 0;
   @type("number") roundTimerMs = 120000;
+  @type("number") roundIntroMs = 0;
   @type("number") targetScore = 3;
   @type({ map: BombermanTile }) tiles = new MapSchema<BombermanTile>();
   @type({ map: BombermanBomb }) bombs = new MapSchema<BombermanBomb>();
@@ -105,7 +137,9 @@ const BOMB_TIMER_MS = 1800;
 const EXPLOSION_TTL_MS = 450;
 const ROUND_RESTART_DELAY_MS = 2500;
 const ROUND_DURATION_MS = 120000;
+const ROUND_INTRO_MS = 3000;
 const TARGET_SCORE = 3;
+const START_COUNTDOWN_MS = 3000;
 const POWER_UP_TYPES: PowerUpType[] = ["bomb", "range", "speed", "shield"];
 
 export class BombermanRoom extends Room {
@@ -116,11 +150,16 @@ export class BombermanRoom extends Room {
   nextExplosionId = 1;
   roundRestartTimerMs = 0;
   privateRoom = false;
-  selectedMap: BombermanMapDefinition = findBombermanMap();
+  roomPassword = "";
+  selectedMap: BombermanMapDefinition = resolveBombermanMap();
 
   onCreate(options: BombermanJoinOptions = {}) {
+    this.maxClients = this.normalizeMaxClients(options.maxClients);
+    this.state.maxPlayers = this.maxClients;
+    this.roomPassword = this.normalizePassword(options.password);
+    this.state.hasPassword = this.roomPassword.length > 0;
     this.privateRoom = Boolean(options.privateRoom);
-    this.selectedMap = findBombermanMap(options.mapId);
+    this.selectedMap = resolveBombermanMap(options.mapId);
     this.applyMapDefinition();
     this.createMap();
     this.updateRoomMetadata();
@@ -163,6 +202,7 @@ export class BombermanRoom extends Room {
       }
 
       player.ready = Boolean(ready);
+      this.cancelCountdownIfNeeded();
       this.updateRoomMetadata();
     });
 
@@ -172,12 +212,26 @@ export class BombermanRoom extends Room {
         return;
       }
 
-      this.state.phase = "playing";
-      this.lock();
-      this.resetScores();
-      this.resetRound();
+      this.startCountdown();
       this.updateRoomMetadata();
     });
+
+    this.onMessage("kickPlayer", (client, targetSessionId: string) => {
+      this.kickPlayer(client, targetSessionId);
+    });
+
+    this.onMessage("transferHost", (client, targetSessionId: string) => {
+      this.transferHost(client.sessionId, targetSessionId);
+    });
+  }
+
+  onAuth(_client: Client, options: BombermanJoinOptions = {}) {
+    if (!this.roomPassword) {
+      return true;
+    }
+
+    // 密码只在服务端校验，不写入同步状态，避免其他玩家看到明文密码。
+    return this.normalizePassword(options.password) === this.roomPassword;
   }
 
   onJoin(client: Client, options: BombermanJoinOptions = {}) {
@@ -186,8 +240,13 @@ export class BombermanRoom extends Room {
 
     player.x = this.tileToWorldX(spawn.tileX);
     player.y = this.tileToWorldY(spawn.tileY);
-    player.color = spawn.color;
+    const role = this.findPlayerRole(options.roleId);
+    player.color = this.normalizeColor(options.color, spawn.color);
     player.nickname = this.normalizeNickname(options.nickname);
+    player.roleId = role.id;
+    player.title = role.title;
+    player.avatar = role.avatar;
+    player.skinId = role.skinId;
     player.isHost = this.state.players.size === 0;
 
     this.state.players.set(client.sessionId, player);
@@ -197,13 +256,33 @@ export class BombermanRoom extends Room {
 
   onLeave(client: Client) {
     this.state.players.delete(client.sessionId);
+    this.cancelCountdownIfNeeded();
     this.ensureHost();
     this.updateRoomMetadata();
     console.log("Bomberman left", { roomId: this.roomId, sessionId: client.sessionId });
   }
 
+  async onDrop(client: Client) {
+    try {
+      // 非主动掉线时保留座位 10 秒，客户端可用重连令牌回到原房间。
+      await this.allowReconnection(client, 10);
+    } catch {
+      // 超时后交给 onLeave 做最终清理和房主转让。
+    }
+  }
+
   fixedTick() {
+    if (this.state.phase === "lobby") {
+      this.updateStartCountdown();
+      return;
+    }
+
     if (this.state.phase !== "playing") {
+      return;
+    }
+
+    if (this.state.roundIntroMs > 0) {
+      this.state.roundIntroMs = Math.max(0, this.state.roundIntroMs - this.fixedTimeStep);
       return;
     }
 
@@ -424,12 +503,14 @@ export class BombermanRoom extends Room {
 
   resetRound() {
     this.state.phase = "playing";
+    this.state.countdownMs = 0;
     this.state.roundStatus = "playing";
     this.state.matchStatus = "playing";
     this.state.winnerSessionId = "";
     this.state.matchWinnerSessionId = "";
     this.roundRestartTimerMs = 0;
     this.state.roundNumber++;
+    this.state.roundIntroMs = ROUND_INTRO_MS;
     this.state.roundTimerMs = ROUND_DURATION_MS;
     this.state.targetScore = TARGET_SCORE;
 
@@ -445,7 +526,6 @@ export class BombermanRoom extends Room {
       const spawn = this.spawnPointAt(playerIndex);
       player.x = this.tileToWorldX(spawn.tileX);
       player.y = this.tileToWorldY(spawn.tileY);
-      player.color = spawn.color;
       player.alive = true;
       player.ready = false;
       player.bombLimit = 1;
@@ -570,6 +650,10 @@ export class BombermanRoom extends Room {
     // 地图尺寸和偏移由服务端统一写入状态，客户端只按同步数据绘制。
     this.state.mapId = this.selectedMap.id;
     this.state.mapName = this.selectedMap.name;
+    this.state.mapDescription = this.selectedMap.description;
+    this.state.mapDifficulty = this.selectedMap.difficulty;
+    this.state.mapRecommendedPlayers = this.selectedMap.recommendedPlayers;
+    this.state.mapPreview = this.selectedMap.previewRows.join("|");
     this.state.columns = this.selectedMap.columns;
     this.state.rows = this.selectedMap.rows;
     this.state.tileSize = this.selectedMap.tileSize;
@@ -601,11 +685,76 @@ export class BombermanRoom extends Room {
   }
 
   canStartGame() {
+    if (this.state.countdownMs > 0) {
+      return false;
+    }
+
     if (this.state.players.size < 2) {
       return false;
     }
 
     return Array.from(this.state.players.values()).every((player) => player.ready);
+  }
+
+  startCountdown() {
+    this.state.countdownMs = START_COUNTDOWN_MS;
+  }
+
+  updateStartCountdown() {
+    if (this.state.countdownMs <= 0) {
+      return;
+    }
+
+    if (!this.canContinueCountdown()) {
+      this.state.countdownMs = 0;
+      this.updateRoomMetadata();
+      return;
+    }
+
+    this.state.countdownMs = Math.max(0, this.state.countdownMs - this.fixedTimeStep);
+    if (this.state.countdownMs <= 0) {
+      this.state.phase = "playing";
+      this.lock();
+      this.resetScores();
+      this.resetRound();
+      this.updateRoomMetadata();
+    }
+  }
+
+  canContinueCountdown() {
+    return this.state.players.size >= 2 && Array.from(this.state.players.values()).every((player) => player.ready);
+  }
+
+  cancelCountdownIfNeeded() {
+    if (this.state.phase === "lobby" && this.state.countdownMs > 0 && !this.canContinueCountdown()) {
+      this.state.countdownMs = 0;
+    }
+  }
+
+  kickPlayer(client: Client, targetSessionId: string) {
+    const actor = this.state.players.get(client.sessionId);
+    const target = this.state.players.get(targetSessionId);
+    if (!actor?.isHost || !target || targetSessionId === client.sessionId || this.state.phase !== "lobby") {
+      return;
+    }
+
+    const targetClient = this.clients.find((roomClient) => roomClient.sessionId === targetSessionId);
+    targetClient?.leave(4000, "kicked");
+  }
+
+  transferHost(actorSessionId: string, targetSessionId: string) {
+    const actor = this.state.players.get(actorSessionId);
+    const target = this.state.players.get(targetSessionId);
+    if (!actor?.isHost || !target || targetSessionId === actorSessionId || this.state.phase !== "lobby") {
+      return;
+    }
+
+    // 房主身份只允许一个玩家持有，转让时先清空再赋给目标玩家。
+    this.state.players.forEach((player) => {
+      player.isHost = false;
+    });
+    target.isHost = true;
+    this.updateRoomMetadata();
   }
 
   ensureHost() {
@@ -628,8 +777,14 @@ export class BombermanRoom extends Room {
       phase: this.state.phase,
       mapId: this.state.mapId,
       mapName: this.state.mapName,
+      mapDescription: this.state.mapDescription,
+      mapDifficulty: this.state.mapDifficulty,
+      mapRecommendedPlayers: this.state.mapRecommendedPlayers,
+      mapPreview: this.state.mapPreview,
       playerCount: this.state.players.size,
       maxClients: this.maxClients,
+      hasPassword: this.state.hasPassword,
+      countdownMs: this.state.countdownMs,
       readyCount,
     });
   }
@@ -637,5 +792,28 @@ export class BombermanRoom extends Room {
   normalizeNickname(nickname?: string) {
     const value = String(nickname ?? "").trim().slice(0, 16);
     return value || "玩家";
+  }
+
+  normalizePassword(password?: string) {
+    return String(password ?? "").trim().slice(0, 24);
+  }
+
+  normalizeColor(color?: string, fallback = "#f6c453") {
+    const value = String(color ?? "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+  }
+
+  findPlayerRole(roleId?: string) {
+    // 角色只接受服务端白名单，保证所有客户端看到的头像和皮肤一致。
+    return PLAYER_ROLES.find((role) => role.id === roleId) ?? DEFAULT_PLAYER_ROLE;
+  }
+
+  normalizeMaxClients(maxClients?: number) {
+    const value = Number(maxClients);
+    if (!Number.isFinite(value)) {
+      return 4;
+    }
+
+    return Math.max(2, Math.min(4, Math.floor(value)));
   }
 }

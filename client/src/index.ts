@@ -3,6 +3,7 @@ import Phaser from "phaser";
 import { SceneSelector } from "./scenes/SceneSelector";
 import { BombermanScene } from "./scenes/BombermanScene";
 import { ProfileScene } from "./scenes/ProfileScene";
+import { soundManager } from "./soundManager";
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
@@ -27,4 +28,21 @@ const config: Phaser.Types.Core.GameConfig = {
     scene: [SceneSelector, BombermanScene, ProfileScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+document.querySelector<HTMLAnchorElement>("[data-action='main-menu']")?.addEventListener("click", async (event) => {
+    event.preventDefault();
+    void soundManager.unlock();
+    soundManager.play("button");
+
+    window.history.replaceState(null, "", window.location.pathname);
+
+    const bombermanScene = game.scene.getScene("bomberman") as BombermanScene;
+    if (game.scene.isActive("bomberman") && bombermanScene.room) {
+        await bombermanScene.leaveRoom();
+    }
+
+    game.scene.stop("profile");
+    game.scene.stop("bomberman");
+    game.scene.start("selector");
+});

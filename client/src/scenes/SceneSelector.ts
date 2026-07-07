@@ -1,15 +1,17 @@
 import Phaser from "phaser";
 
+import { soundManager } from "../soundManager";
+
 type MenuItem = {
     title: string;
     detail: string;
-    action: "bomberman" | "profile" | "todo";
+    action: "bomberman" | "match" | "profile" | "todo";
 };
 
 export class SceneSelector extends Phaser.Scene {
     menuItems: MenuItem[] = [
         { title: "多人对战", detail: "创建房间或输入房间号加入", action: "bomberman" },
-        { title: "随机匹配", detail: "自动寻找在线玩家", action: "todo" },
+        { title: "随机匹配", detail: "自动寻找在线玩家", action: "match" },
         { title: "个人信息", detail: "查看昵称、积分和战绩", action: "profile" },
         { title: "设备连接", detail: "绑定震动反馈硬件", action: "todo" },
     ];
@@ -129,7 +131,13 @@ export class SceneSelector extends Phaser.Scene {
 
         bg.on("pointerup", () => {
             container.setScale(1.015);
-            if (item.action === "bomberman" || item.action === "profile") {
+            void soundManager.unlock();
+            soundManager.play("button");
+            if (item.action === "match") {
+                window.sessionStorage.setItem("bomberman:auto-match", "1");
+                window.location.hash = "bomberman";
+                this.runScene("bomberman");
+            } else if (item.action === "bomberman" || item.action === "profile") {
                 window.location.hash = item.action;
                 this.runScene(item.action);
             } else {
@@ -170,6 +178,7 @@ export class SceneSelector extends Phaser.Scene {
         this.modalLayer = this.add.container(0, 0, [overlay, panel, heading, body, buttonBg, buttonText]);
 
         const close = () => {
+            soundManager.play("button");
             this.modalLayer?.destroy();
             this.modalLayer = undefined;
         };

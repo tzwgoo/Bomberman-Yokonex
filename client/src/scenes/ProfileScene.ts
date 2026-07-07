@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 
-import { loadProfileState, PROFILE_COLORS, resetPlayerStats, updateProfile, type ProfileState } from "../profileStore";
+import { findPlayerRole, loadProfileState, PLAYER_ROLES, PROFILE_COLORS, resetPlayerStats, updateProfile, type ProfileState } from "../profileStore";
+import { soundManager } from "../soundManager";
 
 export class ProfileScene extends Phaser.Scene {
     panel?: HTMLElement;
@@ -33,19 +34,20 @@ export class ProfileScene extends Phaser.Scene {
         const profile = this.state.profile;
         const stats = this.state.stats;
         const winRate = stats.matches ? Math.round((stats.wins / stats.matches) * 100) : 0;
+        const role = findPlayerRole(profile.roleId);
         const nickname = this.escapeHtml(profile.nickname);
-        const title = this.escapeHtml(profile.title);
+        const title = this.escapeHtml(role.title);
 
         const panel = document.createElement("section");
         panel.className = "profile-panel";
         panel.innerHTML = `
             <div class="profile-shell">
                 <header class="profile-header">
-                    <div class="profile-avatar" data-role="avatar" style="background:${profile.color}">${nickname.slice(0, 1)}</div>
+                    <div class="profile-avatar" data-role="avatar" style="background:${profile.color}">${role.avatar}</div>
                     <div>
                         <p>个人信息</p>
                         <h2>${nickname}</h2>
-                        <span>${title}</span>
+                        <span>${title} · ${this.escapeHtml(role.name)}</span>
                     </div>
                 </header>
 
@@ -55,6 +57,8 @@ export class ProfileScene extends Phaser.Scene {
                     <input id="profile-nickname" type="text" maxlength="16" value="${nickname}" />
                     <label>角色颜色</label>
                     <div class="profile-colors" data-role="colors"></div>
+                    <label>角色选择</label>
+                    <div class="profile-roles" data-role="roles"></div>
                     <div class="profile-actions">
                         <button data-action="save">保存资料</button>
                         <button class="secondary" data-action="back">返回菜单</button>
@@ -82,6 +86,7 @@ export class ProfileScene extends Phaser.Scene {
         document.body.appendChild(panel);
         this.panel = panel;
         this.renderColorOptions();
+        this.renderRoleOptions();
     }
 
     destroyProfilePanel() {
@@ -106,18 +111,49 @@ export class ProfileScene extends Phaser.Scene {
         });
     }
 
+    renderRoleOptions() {
+        const roleList = this.panel?.querySelector<HTMLElement>("[data-role='roles']");
+        if (!roleList) {
+            return;
+        }
+
+        roleList.innerHTML = "";
+        PLAYER_ROLES.forEach((role) => {
+            const button = document.createElement("button");
+            button.className = `profile-role${role.id === this.state.profile.roleId ? " is-selected" : ""}`;
+            button.dataset.action = "role";
+            button.dataset.roleId = role.id;
+            button.innerHTML = `
+                <i>${role.avatar}</i>
+                <strong>${this.escapeHtml(role.name)}</strong>
+                <span>${this.escapeHtml(role.description)}</span>
+            `;
+            roleList.appendChild(button);
+        });
+    }
+
     handleProfileClick(event: Event) {
         const target = (event.target as HTMLElement).closest<HTMLElement>("[data-action]");
         if (!target) {
             return;
         }
 
+        void soundManager.unlock();
+        soundManager.play("button");
+
         if (target.dataset.action === "back") {
-            window.location.hash = "";
-            this.game.scene.switch("profile", "selector");
+            this.backToMenu();
         } else if (target.dataset.action === "color") {
             this.state.profile.color = target.dataset.color ?? this.state.profile.color;
             this.renderColorOptions();
+            this.updateAvatar();
+        } else if (target.dataset.action === "role") {
+            const role = findPlayerRole(target.dataset.roleId);
+            this.state.profile.roleId = role.id;
+            this.state.profile.title = role.title;
+            this.state.profile.avatar = role.avatar;
+            this.state.profile.skinId = role.skinId;
+            this.renderRoleOptions();
             this.updateAvatar();
         } else if (target.dataset.action === "save") {
             this.saveProfile();
@@ -133,6 +169,7 @@ export class ProfileScene extends Phaser.Scene {
         this.state = updateProfile({
             nickname,
             color: this.state.profile.color,
+            roleId: this.state.profile.roleId,
         });
         this.destroyProfilePanel();
         this.createProfilePanel();
@@ -142,7 +179,9 @@ export class ProfileScene extends Phaser.Scene {
     updateAvatar() {
         const avatar = this.panel?.querySelector<HTMLElement>("[data-role='avatar']");
         if (avatar) {
+            const role = findPlayerRole(this.state.profile.roleId);
             avatar.style.background = this.state.profile.color;
+            avatar.textContent = role.avatar;
         }
     }
 
@@ -151,6 +190,13 @@ export class ProfileScene extends Phaser.Scene {
         if (messageEl) {
             messageEl.textContent = message;
         }
+    }
+
+    backToMenu() {
+        // 返回主菜单只切 Phaser 场景，不触发浏览器重新加载，避免跳回旧 hash 页面。
+        window.history.replaceState(null, "", window.location.pathname);
+        this.scene.stop("profile");
+        this.scene.start("selector");
     }
 
     escapeHtml(value: string) {

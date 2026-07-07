@@ -33,7 +33,14 @@ const server = defineServer({
         });
 
         app.get("/maps/bomberman", (_req, res) => {
-            res.json(BOMBERMAN_MAPS.map(({ id, name, description }) => ({ id, name, description })));
+            res.json(BOMBERMAN_MAPS.map(({ id, name, description, difficulty, recommendedPlayers, previewRows }) => ({
+                id,
+                name,
+                description,
+                difficulty,
+                recommendedPlayers,
+                previewRows,
+            })));
         });
 
         if (process.env.NODE_ENV !== "production") {
