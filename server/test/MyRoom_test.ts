@@ -103,7 +103,7 @@ describe("bomberman room", () => {
     assert.strictEqual(fallbackRoom.state.mapId, "classic");
   });
 
-  it("settles power ups on the server", async () => {
+  it("applies power up effects on the server", async () => {
     const room = await colyseus.createRoom<BombermanRoom>("bomberman_room", {});
     const host = await colyseus.connectTo(room, { nickname: "Host" });
     const guest = await colyseus.connectTo(room, { nickname: "Guest" });
@@ -118,28 +118,43 @@ describe("bomberman room", () => {
     const player = room.state.players.get(host.sessionId);
     assert.ok(player);
 
-    const playerTile = room.worldToTile(player.x, player.y);
-    const powerUp = new BombermanPowerUp();
-    powerUp.id = "test-bomb";
-    powerUp.x = playerTile.tileX;
-    powerUp.y = playerTile.tileY;
-    powerUp.type = "bomb";
-    room.state.powerUps.set(room.tileKey(powerUp.x, powerUp.y), powerUp);
+    const collectedMessages: string[] = [];
+    host.onMessage("powerUpCollected", (message) => collectedMessages.push(message.type));
+    guest.onMessage("powerUpCollected", () => {});
 
-    const input: BombermanInput = {
-      left: false,
-      right: false,
-      up: false,
-      down: false,
-      placeBomb: false,
-      tick: 1,
+    const playerTile = room.worldToTile(player.x, player.y);
+    let tick = 1;
+    const collect = async (type: string) => {
+      const powerUp = new BombermanPowerUp();
+      powerUp.id = `test-${type}`;
+      powerUp.x = playerTile.tileX;
+      powerUp.y = playerTile.tileY;
+      powerUp.type = type;
+      room.state.powerUps.set(room.tileKey(powerUp.x, powerUp.y), powerUp);
+
+      const input: BombermanInput = {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        placeBomb: false,
+        tick: tick++,
+      };
+
+      host.send("input", input);
+      await room.waitForNextPatch();
     };
 
-    host.send("input", input);
-    await room.waitForNextPatch();
-
+    await collect("bomb");
     assert.strictEqual(player.bombLimit, 2);
+    await collect("range");
+    assert.strictEqual(player.blastRange, 3);
+    await collect("speed");
+    assert.ok(player.speed > 2);
+    await collect("shield");
+    assert.strictEqual(player.shield, true);
     assert.strictEqual(room.state.powerUps.size, 0);
+    assert.deepStrictEqual(collectedMessages, ["bomb", "range", "speed", "shield"]);
   });
 
   it("tracks multi-round score and match winner", async () => {

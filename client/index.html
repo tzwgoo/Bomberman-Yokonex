@@ -46,11 +46,14 @@
         a { color: var(--gold); text-decoration: none; }
         a:hover { color: #ffe28b; }
         input { outline: none; }
+        #phaser-example {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: calc(100vh - 64px);
+        }
         canvas {
             display: block;
-            width: min(100vw, calc((100vh - 74px) * 4 / 3));
-            height: auto;
-            max-height: calc(100vh - 74px);
             image-rendering: pixelated;
             box-shadow: 0 0 0 1px rgba(255,255,255,0.08), var(--shadow);
         }
@@ -212,6 +215,207 @@
             transition-duration: 140ms;
         }
         .result-panel button:active { transform: scale(0.96); }
+        .powerup-panel {
+            position: fixed;
+            right: max(18px, env(safe-area-inset-right));
+            bottom: calc(112px + env(safe-area-inset-bottom));
+            width: min(360px, calc(100vw - 36px));
+            color: var(--ink);
+            z-index: 19;
+            pointer-events: none;
+        }
+        .powerup-panel[hidden] { display: none; }
+        .powerup-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            padding: 10px;
+            background: rgba(7, 12, 18, 0.72);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 16px 34px rgba(0,0,0,0.28);
+            backdrop-filter: blur(8px);
+        }
+        .powerup-grid span {
+            display: grid;
+            gap: 3px;
+            min-height: 46px;
+            align-content: center;
+            text-align: center;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .powerup-grid i {
+            display: block;
+            font-style: normal;
+            font-size: 20px;
+            line-height: 1;
+            font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Microsoft YaHei", sans-serif;
+        }
+        .powerup-grid strong {
+            color: var(--gold);
+            font-size: 18px;
+            font-variant-numeric: tabular-nums;
+        }
+        .powerup-toast {
+            width: fit-content;
+            max-width: 100%;
+            margin: 0 0 10px auto;
+            padding: 9px 12px;
+            color: #101820;
+            background: var(--gold);
+            border-radius: 8px;
+            font-weight: 800;
+            box-shadow: 0 12px 26px rgba(246, 196, 83, 0.2);
+        }
+        .powerup-toast[hidden] { display: none; }
+        .profile-panel {
+            position: fixed;
+            inset: 64px 0 0 0;
+            display: flex;
+            justify-content: center;
+            overflow: auto;
+            padding: 28px 18px 40px;
+            color: var(--ink);
+            background:
+                linear-gradient(90deg, rgba(14, 20, 27, 0.96), rgba(14, 20, 27, 0.88)),
+                radial-gradient(circle at 78% 20%, rgba(246, 196, 83, 0.12), transparent 28%);
+            z-index: 18;
+        }
+        .profile-shell {
+            width: min(980px, 100%);
+            display: grid;
+            grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.2fr);
+            gap: 16px;
+            align-content: start;
+        }
+        .profile-header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: rgba(19, 29, 39, 0.82);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px var(--line), var(--shadow);
+        }
+        .profile-avatar {
+            width: 76px;
+            height: 76px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            color: #101820;
+            font-size: 36px;
+            font-weight: 900;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 16px 30px rgba(0,0,0,0.28);
+        }
+        .profile-header p {
+            color: var(--blue);
+            font-size: 14px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .profile-header h2 {
+            font-size: 34px;
+            line-height: 1.1;
+            margin-bottom: 4px;
+        }
+        .profile-header span,
+        .profile-note {
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .profile-card {
+            display: grid;
+            gap: 10px;
+            padding: 16px;
+            background: rgba(19, 29, 39, 0.9);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px var(--line), var(--shadow);
+        }
+        .profile-card h3 {
+            font-size: 22px;
+            line-height: 1.2;
+        }
+        .profile-card label {
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .profile-card input[type="text"] {
+            width: 100%;
+            min-height: 42px;
+            color: var(--ink);
+            background: rgba(7, 12, 18, 0.72);
+            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 8px;
+            padding: 9px 10px;
+        }
+        .profile-colors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .profile-color {
+            width: 42px;
+            height: 42px;
+            border: 0;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.16);
+            transition-property: transform, box-shadow;
+            transition-duration: 140ms;
+        }
+        .profile-color.is-selected {
+            box-shadow: 0 0 0 3px var(--gold), 0 10px 20px rgba(246, 196, 83, 0.18);
+        }
+        .profile-color:active { transform: scale(0.96); }
+        .profile-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .profile-card button {
+            cursor: pointer;
+            min-height: 40px;
+            padding: 9px 12px;
+            color: #101820;
+            background: var(--gold);
+            border: 0;
+            border-radius: 8px;
+            font-weight: 800;
+            transition-property: transform, opacity, background-color;
+            transition-duration: 140ms;
+        }
+        .profile-card button:active { transform: scale(0.96); }
+        .profile-card button.secondary {
+            color: var(--ink);
+            background: #2c3e50;
+        }
+        .profile-card button.danger {
+            color: #fff;
+            background: var(--danger);
+        }
+        .profile-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+            gap: 10px;
+        }
+        .profile-stats span {
+            display: grid;
+            gap: 6px;
+            min-height: 76px;
+            align-content: center;
+            padding: 10px;
+            color: var(--muted);
+            background: rgba(7, 12, 18, 0.58);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+        }
+        .profile-stats strong {
+            color: var(--gold);
+            font-size: 26px;
+            font-variant-numeric: tabular-nums;
+        }
         .lobby-panel label { display: block; color: var(--muted); font-size: 13px; margin: 0 0 6px; }
         .lobby-panel input[type="text"] {
             width: 100%;
@@ -393,7 +597,11 @@
         }
         @media (max-width: 720px) {
             div.menu { min-height: 56px; padding: 8px 10px; }
+            #phaser-example { min-height: calc(100vh - 56px); }
             .lobby-panel { top: 56px; padding-top: 18px; }
+            .profile-panel { top: 56px; padding-top: 18px; }
+            .profile-shell { grid-template-columns: 1fr; }
+            .profile-header { align-items: flex-start; }
             .lobby-header,
             .lobby-section-title {
                 align-items: stretch;
@@ -408,6 +616,11 @@
             .room-card { align-items: stretch; flex-direction: column; }
         }
         @media (orientation: portrait) {
+            .powerup-panel {
+                right: 12px;
+                bottom: 156px;
+                width: min(320px, calc(100vw - 24px));
+            }
             .touch-controls {
                 padding-bottom: max(18px, env(safe-area-inset-bottom));
             }
@@ -456,6 +669,8 @@
             <a href="/" class="button">主菜单</a>
         </div>
     </div>
+
+    <div id="phaser-example"></div>
 
     <script src="/src/index.ts" type="module"></script>
 

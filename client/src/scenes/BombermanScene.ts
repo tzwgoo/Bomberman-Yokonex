@@ -3,6 +3,7 @@ import { Client, Room, getStateCallbacks } from "@colyseus/sdk";
 
 import { BACKEND_HTTP_URL, BACKEND_URL } from "../backend";
 import { BOMBERMAN_MAP_OPTIONS, type BombermanMapOption } from "../bombermanMaps";
+import { loadProfileState, recordMatchResult, updateProfile } from "../profileStore";
 
 import type server from "../../../server/src/app.config";
 import type { BombermanInput, BombermanRoom } from "../../../server/src/rooms/BombermanRoom";
@@ -24,6 +25,12 @@ type RoomSummary = {
 
 type LobbyView = "rooms" | "create" | "joined";
 
+type PowerUpCollectedMessage = {
+    nickname: string;
+    type: string;
+    label: string;
+};
+
 export class BombermanScene extends Phaser.Scene {
     client = new Client<typeof server>(BACKEND_URL);
     room?: Room<BombermanRoom>;
@@ -42,6 +49,7 @@ export class BombermanScene extends Phaser.Scene {
     lobbyPanel?: HTMLElement;
     resultPanel?: HTMLElement;
     touchControls?: HTMLElement;
+    powerUpPanel?: HTMLElement;
     roomListEl?: HTMLElement;
     playerListEl?: HTMLElement;
     lobbyMessageEl?: HTMLElement;
@@ -56,6 +64,8 @@ export class BombermanScene extends Phaser.Scene {
     };
     touchBombQueued = false;
     soundEnabled = true;
+    powerUpToastTimer?: number;
+    recordedMatchRoomId = "";
 
     inputPayload: BombermanInput = {
         left: false,
@@ -88,11 +98,13 @@ export class BombermanScene extends Phaser.Scene {
 
         this.createLobbyPanel();
         this.createResultPanel();
+        this.createPowerUpPanel();
         this.createTouchControls();
         this.refreshRoomList();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.destroyLobbyPanel();
             this.destroyResultPanel();
+            this.destroyPowerUpPanel();
             this.destroyTouchControls();
         });
     }
@@ -140,7 +152,7 @@ export class BombermanScene extends Phaser.Scene {
                     </div>
                     <div class="lobby-player">
                         <label for="bomberman-nickname">昵称</label>
-                        <input id="bomberman-nickname" type="text" maxlength="16" value="玩家" />
+                        <input id="bomberman-nickname" type="text" maxlength="16" value="${loadProfileState().profile.nickname}" />
                     </div>
                 </header>
 
@@ -241,6 +253,31 @@ export class BombermanScene extends Phaser.Scene {
     destroyResultPanel() {
         this.resultPanel?.remove();
         this.resultPanel = undefined;
+    }
+
+    createPowerUpPanel() {
+        const panel = document.createElement("section");
+        panel.className = "powerup-panel";
+        panel.hidden = true;
+        panel.innerHTML = `
+            <div class="powerup-toast" data-role="powerup-toast" hidden></div>
+            <div class="powerup-grid">
+                <span><i>💣</i>炸弹 <strong data-stat="bomb">1</strong></span>
+                <span><i>🔥</i>火力 <strong data-stat="range">2</strong></span>
+                <span><i>⚡</i>速度 <strong data-stat="speed">2.0</strong></span>
+                <span><i>🛡️</i>护盾 <strong data-stat="shield">无</strong></span>
+            </div>
+        `;
+        document.body.appendChild(panel);
+        this.powerUpPanel = panel;
+    }
+
+    destroyPowerUpPanel() {
+        if (this.powerUpToastTimer) {
+            window.clearTimeout(this.powerUpToastTimer);
+        }
+        this.powerUpPanel?.remove();
+        this.powerUpPanel = undefined;
     }
 
     createTouchControls() {
@@ -395,6 +432,7 @@ export class BombermanScene extends Phaser.Scene {
 
     async useRoom(room: Room<BombermanRoom>) {
         this.room = room;
+        this.recordedMatchRoomId = "";
         this.clearGameObjects();
         this.drawArenaFloor();
         this.statusText.setText(`Room: ${room.roomId}`);
@@ -403,9 +441,14 @@ export class BombermanScene extends Phaser.Scene {
 
         const $ = getStateCallbacks(room);
 
+        room.onMessage("powerUpCollected", (message: PowerUpCollectedMessage) => {
+            this.showPowerUpToast(`${message.nickname} 获得 ${message.label}`);
+        });
+
         $(room.state).listen("phase", () => {
             this.renderLobbyState();
             this.updateTouchControlsVisibility();
+            this.updatePowerUpPanel();
             this.updateRoundStatus(room.state.roundStatus);
         });
 
@@ -480,11 +523,11 @@ export class BombermanScene extends Phaser.Scene {
             const { x, y } = this.tileToWorld(powerUp.x, powerUp.y);
             const icon = this.powerUpIcon(powerUp.type);
             const entity = this.add.text(x, y, icon, {
-                color: "#101820",
-                backgroundColor: "#f6c453",
-                fontFamily: "Verdana",
-                fontSize: "18px",
-                padding: { x: 5, y: 3 },
+                color: "#ffffff",
+                backgroundColor: "#101820",
+                fontFamily: "Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Microsoft YaHei",
+                fontSize: "25px",
+                padding: { x: 5, y: 4 },
             }).setOrigin(0.5).setDepth(3);
             this.powerUpEntities[key] = entity;
         });
@@ -511,6 +554,7 @@ export class BombermanScene extends Phaser.Scene {
                 entity.fillColor = Phaser.Display.Color.HexStringToColor(player.color).color;
                 entity.alpha = player.alive ? 1 : 0.28;
                 this.renderLobbyState();
+                this.updatePowerUpPanel();
                 this.updateRoundStatus(room.state.roundStatus);
                 this.renderResultPanel();
             });
@@ -526,6 +570,7 @@ export class BombermanScene extends Phaser.Scene {
 
         this.renderLobbyState();
         this.updateTouchControlsVisibility();
+        this.updatePowerUpPanel();
         this.renderResultPanel();
     }
 
@@ -541,6 +586,7 @@ export class BombermanScene extends Phaser.Scene {
         this.statusText.setText("大厅");
         this.renderLobbyState();
         this.updateTouchControlsVisibility();
+        this.updatePowerUpPanel();
         this.renderResultPanel();
         this.switchLobbyView("rooms");
         await this.refreshRoomList();
@@ -768,6 +814,8 @@ export class BombermanScene extends Phaser.Scene {
         if (detail) {
             detail.textContent = `最终比分：${this.scoreText()}`;
         }
+
+        this.recordLocalMatchResult(winnerId);
     }
 
     updateTouchControlsVisibility() {
@@ -777,6 +825,40 @@ export class BombermanScene extends Phaser.Scene {
 
         // 移动端按钮只在正式开局后显示，避免遮挡大厅操作。
         this.touchControls.hidden = this.room?.state.phase !== "playing";
+    }
+
+    updatePowerUpPanel() {
+        if (!this.powerUpPanel) {
+            return;
+        }
+
+        const player = this.room?.state.players.get(this.room.sessionId);
+        const visible = Boolean(this.room && player && this.room.state.phase === "playing");
+        this.powerUpPanel.hidden = !visible;
+        if (!player) {
+            return;
+        }
+
+        this.powerUpPanel.querySelector<HTMLElement>("[data-stat='bomb']")!.textContent = `${player.bombLimit}`;
+        this.powerUpPanel.querySelector<HTMLElement>("[data-stat='range']")!.textContent = `${player.blastRange}`;
+        this.powerUpPanel.querySelector<HTMLElement>("[data-stat='speed']")!.textContent = player.speed.toFixed(1);
+        this.powerUpPanel.querySelector<HTMLElement>("[data-stat='shield']")!.textContent = player.shield ? "有" : "无";
+    }
+
+    showPowerUpToast(message: string) {
+        const toast = this.powerUpPanel?.querySelector<HTMLElement>("[data-role='powerup-toast']");
+        if (!toast) {
+            return;
+        }
+
+        toast.textContent = message;
+        toast.hidden = false;
+        if (this.powerUpToastTimer) {
+            window.clearTimeout(this.powerUpToastTimer);
+        }
+        this.powerUpToastTimer = window.setTimeout(() => {
+            toast.hidden = true;
+        }, 1600);
     }
 
     clearGameObjects() {
@@ -821,7 +903,9 @@ export class BombermanScene extends Phaser.Scene {
     }
 
     nickname() {
-        return this.lobbyPanel?.querySelector<HTMLInputElement>("#bomberman-nickname")?.value ?? "玩家";
+        const nickname = this.lobbyPanel?.querySelector<HTMLInputElement>("#bomberman-nickname")?.value ?? "玩家";
+        updateProfile({ nickname });
+        return nickname;
     }
 
     privateRoom() {
@@ -844,17 +928,34 @@ export class BombermanScene extends Phaser.Scene {
 
     powerUpIcon(type: string) {
         if (type === "bomb") {
-            return "B+";
+            return "💣";
         }
 
         if (type === "range") {
-            return "R+";
+            return "🔥";
         }
 
         if (type === "speed") {
-            return "S+";
+            return "⚡";
         }
 
-        return "SH";
+        return "🛡️";
+    }
+
+    recordLocalMatchResult(winnerId: string) {
+        if (!this.room || this.recordedMatchRoomId === this.room.roomId) {
+            return;
+        }
+
+        // 本地个人战绩只在整场比赛结算时记录一次，避免 UI 重绘重复计数。
+        if (!winnerId) {
+            recordMatchResult("draw");
+        } else if (winnerId === this.room.sessionId) {
+            recordMatchResult("win");
+        } else {
+            recordMatchResult("loss");
+        }
+
+        this.recordedMatchRoomId = this.room.roomId;
     }
 }

@@ -18,6 +18,15 @@ export interface BombermanJoinOptions {
   mapId?: string;
 }
 
+type PowerUpType = "bomb" | "range" | "speed" | "shield";
+
+const POWER_UP_LABELS: Record<PowerUpType, string> = {
+  bomb: "炸弹容量",
+  range: "爆炸范围",
+  speed: "移动速度",
+  shield: "能量护盾",
+};
+
 export class BombermanPlayer extends Schema {
   @type("number") x = 0;
   @type("number") y = 0;
@@ -97,7 +106,7 @@ const EXPLOSION_TTL_MS = 450;
 const ROUND_RESTART_DELAY_MS = 2500;
 const ROUND_DURATION_MS = 120000;
 const TARGET_SCORE = 3;
-const POWER_UP_TYPES = ["bomb", "range", "speed", "shield"];
+const POWER_UP_TYPES: PowerUpType[] = ["bomb", "range", "speed", "shield"];
 
 export class BombermanRoom extends Room {
   maxClients = 4;
@@ -463,7 +472,7 @@ export class BombermanRoom extends Room {
     powerUp.id = `${this.state.roundNumber}:${x},${y}`;
     powerUp.x = x;
     powerUp.y = y;
-    powerUp.type = POWER_UP_TYPES[seed % POWER_UP_TYPES.length];
+    powerUp.type = this.powerUpTypeAt(seed);
     this.state.powerUps.set(this.tileKey(x, y), powerUp);
   }
 
@@ -487,6 +496,15 @@ export class BombermanRoom extends Room {
     }
 
     this.state.powerUps.delete(key);
+    this.broadcast("powerUpCollected", {
+      nickname: player.nickname,
+      type: powerUp.type,
+      label: POWER_UP_LABELS[powerUp.type as PowerUpType],
+    });
+  }
+
+  powerUpTypeAt(seed: number) {
+    return POWER_UP_TYPES[Math.abs(seed) % POWER_UP_TYPES.length];
   }
 
   finishRound(winnerSessionId: string) {

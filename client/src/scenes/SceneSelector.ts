@@ -3,14 +3,14 @@ import Phaser from "phaser";
 type MenuItem = {
     title: string;
     detail: string;
-    action: "bomberman" | "todo";
+    action: "bomberman" | "profile" | "todo";
 };
 
 export class SceneSelector extends Phaser.Scene {
     menuItems: MenuItem[] = [
         { title: "多人对战", detail: "创建房间或输入房间号加入", action: "bomberman" },
         { title: "随机匹配", detail: "自动寻找在线玩家", action: "todo" },
-        { title: "个人信息", detail: "查看昵称、积分和战绩", action: "todo" },
+        { title: "个人信息", detail: "查看昵称、积分和战绩", action: "profile" },
         { title: "设备连接", detail: "绑定震动反馈硬件", action: "todo" },
     ];
 
@@ -23,7 +23,7 @@ export class SceneSelector extends Phaser.Scene {
     create() {
         const sceneKey = window.location.hash.substring(1);
         // 只允许正式入口直达，旧调试场景不再作为外部入口开放。
-        if (sceneKey === "bomberman") {
+        if (sceneKey === "bomberman" || sceneKey === "profile") {
             this.runScene(sceneKey);
             return;
         }
@@ -109,29 +109,29 @@ export class SceneSelector extends Phaser.Scene {
         });
 
         container.add([bg, accent, title, detail, arrow]);
-        container.setSize(300, 100);
-        container.setInteractive({ useHandCursor: true });
+        bg.setInteractive({ useHandCursor: true });
 
-        container.on("pointerover", () => {
+        bg.on("pointerover", () => {
             bg.setFillStyle(0x172638, 1);
             bg.setStrokeStyle(1, item.action === "bomberman" ? 0xf6c453 : 0x63d2ff, 0.8);
             container.setScale(1.015);
         });
 
-        container.on("pointerout", () => {
+        bg.on("pointerout", () => {
             bg.setFillStyle(0x131d27, 0.94);
             bg.setStrokeStyle(1, 0x526a82, 0.55);
             container.setScale(1);
         });
 
-        container.on("pointerdown", () => {
+        bg.on("pointerdown", () => {
             container.setScale(0.96);
         });
 
-        container.on("pointerup", () => {
+        bg.on("pointerup", () => {
             container.setScale(1.015);
-            if (item.action === "bomberman") {
-                this.runScene("bomberman");
+            if (item.action === "bomberman" || item.action === "profile") {
+                window.location.hash = item.action;
+                this.runScene(item.action);
             } else {
                 this.showTodoModal(item.title);
             }
