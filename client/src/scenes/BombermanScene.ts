@@ -456,7 +456,6 @@ export class BombermanScene extends Phaser.Scene {
 
     renderEmsRuleRow(rule: EmsFeedbackRule) {
         const eventLabel = EMS_FEEDBACK_EVENT_LABELS[rule.eventType];
-        const stepsText = JSON.stringify(rule.steps, null, 2);
         return `
             <section class="ems-rule" data-rule="${rule.eventType}">
                 <div class="ems-rule-title">
@@ -467,12 +466,6 @@ export class BombermanScene extends Phaser.Scene {
                     <button class="secondary" data-action="ems-test" data-event-type="${rule.eventType}">测试</button>
                 </div>
                 <div class="ems-rule-grid">
-                    <label>方式
-                        <select data-field="action">
-                            <option value="fixed" ${rule.action === "fixed" ? "selected" : ""}>固定强度</option>
-                            <option value="waveform" ${rule.action === "waveform" ? "selected" : ""}>波形</option>
-                        </select>
-                    </label>
                     <label>A
                         <input type="number" min="0" max="180" data-field="channelA" value="${rule.channelA}" />
                     </label>
@@ -483,7 +476,6 @@ export class BombermanScene extends Phaser.Scene {
                         <input type="number" min="1" max="5000" data-field="durationMs" value="${rule.durationMs}" />
                     </label>
                 </div>
-                <textarea data-field="steps" spellcheck="false">${stepsText}</textarea>
             </section>
         `;
     }
@@ -560,29 +552,18 @@ export class BombermanScene extends Phaser.Scene {
         const maxStrength = Number(this.emsPanel.querySelector<HTMLInputElement>("[data-role='ems-max-strength']")?.value ?? 180);
         const rules = Object.keys(EMS_FEEDBACK_EVENT_LABELS).map((eventType) => {
             const ruleEl = this.emsPanel!.querySelector<HTMLElement>(`[data-rule='${eventType}']`)!;
-            const steps = this.readEmsSteps(ruleEl);
             return {
                 eventType: eventType as EmsFeedbackEventType,
                 enabled: Boolean(ruleEl.querySelector<HTMLInputElement>("[data-field='enabled']")?.checked),
-                action: ruleEl.querySelector<HTMLSelectElement>("[data-field='action']")?.value === "waveform" ? "waveform" : "fixed",
+                action: "fixed" as const,
                 channelA: Number(ruleEl.querySelector<HTMLInputElement>("[data-field='channelA']")?.value ?? 0),
                 channelB: Number(ruleEl.querySelector<HTMLInputElement>("[data-field='channelB']")?.value ?? 0),
                 durationMs: Number(ruleEl.querySelector<HTMLInputElement>("[data-field='durationMs']")?.value ?? 200),
-                steps,
+                steps: [],
             };
         });
 
         return { enabled, maxStrength, rules };
-    }
-
-    readEmsSteps(ruleEl: HTMLElement) {
-        const raw = ruleEl.querySelector<HTMLTextAreaElement>("[data-field='steps']")?.value.trim() ?? "[]";
-        try {
-            const parsed = JSON.parse(raw || "[]");
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            throw new Error("波形格式不是合法JSON");
-        }
     }
 
     setEmsStatus(message: string) {

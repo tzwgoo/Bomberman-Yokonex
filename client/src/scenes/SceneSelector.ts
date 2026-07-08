@@ -1,12 +1,13 @@
 import Phaser from "phaser";
 
 import { clearAuthState, isLoggedIn, loadAuthState } from "../authStore";
+import { emsFeedbackController } from "../emsFeedback";
 import { soundManager } from "../soundManager";
 
 type MenuItem = {
     title: string;
     detail: string;
-    action: "bomberman" | "match" | "profile" | "leaderboard" | "logout" | "todo";
+    action: "bomberman" | "match" | "profile" | "leaderboard" | "logout" | "device";
 };
 
 export class SceneSelector extends Phaser.Scene {
@@ -16,7 +17,7 @@ export class SceneSelector extends Phaser.Scene {
         { title: "个人信息", detail: "查看昵称、积分和战绩", action: "profile" },
         { title: "积分排行", detail: "查看段位和排行榜", action: "leaderboard" },
         { title: "退出登录", detail: "清除当前账号登录状态", action: "logout" },
-        { title: "设备连接", detail: "绑定震动反馈硬件", action: "todo" },
+        { title: "设备连接", detail: "绑定震动反馈硬件", action: "device" },
     ];
 
     modalLayer?: Phaser.GameObjects.Container;
@@ -156,53 +157,92 @@ export class SceneSelector extends Phaser.Scene {
             } else if (item.action === "logout") {
                 this.logout();
             } else {
-                this.showTodoModal(item.title);
+                this.showDeviceModal();
             }
         });
     }
 
-    showTodoModal(title: string) {
+    showDeviceModal() {
         this.modalLayer?.destroy();
 
         const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.52);
-        const panel = this.add.rectangle(400, 302, 390, 190, 0x131d27, 0.98)
+        const panel = this.add.rectangle(400, 306, 430, 238, 0x131d27, 0.98)
             .setStrokeStyle(1, 0xf6c453, 0.7);
 
-        const heading = this.add.text(400, 246, title, {
+        const heading = this.add.text(400, 222, "设备连接", {
             color: "#fff5d6",
             fontFamily: "Microsoft YaHei",
             fontSize: "26px",
             fontStyle: "bold",
         }).setOrigin(0.5);
 
-        const body = this.add.text(400, 294, "功能开发中，后续版本开放。", {
+        const statusText = this.add.text(400, 272, this.deviceStatusText(), {
             color: "#9fb4c8",
             fontFamily: "Microsoft YaHei",
             fontSize: "17px",
+            align: "center",
         }).setOrigin(0.5);
 
-        const buttonBg = this.add.rectangle(400, 352, 116, 42, 0xf6c453)
+        const connectBg = this.add.rectangle(332, 356, 132, 42, 0xf6c453)
             .setInteractive({ useHandCursor: true });
-        const buttonText = this.add.text(400, 352, "知道了", {
+        const connectText = this.add.text(332, 356, "连接EMS", {
             color: "#101820",
             fontFamily: "Microsoft YaHei",
             fontSize: "17px",
             fontStyle: "bold",
         }).setOrigin(0.5);
 
-        this.modalLayer = this.add.container(0, 0, [overlay, panel, heading, body, buttonBg, buttonText]);
+        const closeBg = this.add.rectangle(468, 356, 112, 42, 0x2c3e50)
+            .setInteractive({ useHandCursor: true });
+        const closeText = this.add.text(468, 356, "关闭", {
+            color: "#fff5d6",
+            fontFamily: "Microsoft YaHei",
+            fontSize: "17px",
+            fontStyle: "bold",
+        }).setOrigin(0.5);
+
+        this.modalLayer = this.add.container(0, 0, [overlay, panel, heading, statusText, connectBg, connectText, closeBg, closeText]);
+
+        const updateBatteryStatus = () => {
+            statusText.setText(this.deviceStatusText());
+        };
 
         const close = () => {
             soundManager.play("button");
+            if (emsFeedbackController.onBatteryChange === updateBatteryStatus) {
+                emsFeedbackController.onBatteryChange = undefined;
+            }
             this.modalLayer?.destroy();
             this.modalLayer = undefined;
         };
 
+        // 首页只负责设备连接；事件规则和强度上限仍在对战大厅的 EMS 反馈里配置。
+        emsFeedbackController.onBatteryChange = updateBatteryStatus;
+
         overlay.setInteractive().on("pointerdown", close);
-        buttonBg.on("pointerdown", () => {
-            buttonBg.setScale(0.96);
+        connectBg.on("pointerdown", () => {
+            connectBg.setScale(0.96);
         });
-        buttonBg.on("pointerup", close);
+        connectBg.on("pointerup", async () => {
+            connectBg.setScale(1);
+            soundManager.play("button");
+            statusText.setText("正在连接 EMS...");
+            try {
+                await emsFeedbackController.connect();
+                statusText.setText(this.deviceStatusText());
+            } catch (error) {
+                statusText.setText(error instanceof Error ? error.message : "EMS连接失败");
+            }
+        });
+        closeBg.on("pointerdown", () => {
+            closeBg.setScale(0.96);
+        });
+        closeBg.on("pointerup", close);
+    }
+
+    deviceStatusText() {
+        const battery = emsFeedbackController.batteryLevel >= 0 ? ` · 电量 ${emsFeedbackController.batteryLevel}%` : "";
+        return `${emsFeedbackController.status}${battery}`;
     }
 
     runScene(key: string) {
