@@ -6,6 +6,7 @@ import { BOMBERMAN_MAP_OPTIONS, type BombermanMapOption } from "../bombermanMaps
 import { isLoggedIn, loadAuthState } from "../authStore";
 import { loadProfileState, recordMatchResult, type PlayerProfile } from "../profileStore";
 import { soundManager } from "../soundManager";
+import { EMS_FEEDBACK_EVENT_LABELS, emsFeedbackController, type EmsFeedbackConfig, type EmsFeedbackEventType, type EmsFeedbackRule } from "../emsFeedback";
 
 import type server from "../../../server/src/app.config";
 import type { BombermanInput, BombermanRoom } from "../../../server/src/rooms/BombermanRoom";
@@ -34,6 +35,7 @@ type RoomSummary = {
 type LobbyView = "rooms" | "create" | "joined";
 
 type PowerUpCollectedMessage = {
+    sessionId: string;
     nickname: string;
     type: string;
     label: string;
@@ -74,6 +76,7 @@ export class BombermanScene extends Phaser.Scene {
     resultPanel?: HTMLElement;
     touchControls?: HTMLElement;
     powerUpPanel?: HTMLElement;
+    emsPanel?: HTMLElement;
     matchPanel?: HTMLElement;
     networkBanner?: HTMLElement;
     roomListEl?: HTMLElement;
@@ -106,6 +109,7 @@ export class BombermanScene extends Phaser.Scene {
     recordedMatchRoomId = "";
     matching = false;
     matchCanceled = false;
+    lastReportedEmsBattery = -2;
     ratingChanges: RatingChangedMessage["changes"] = [];
 
     inputPayload: BombermanInput = {
@@ -155,6 +159,8 @@ export class BombermanScene extends Phaser.Scene {
         this.createLobbyPanel();
         this.createResultPanel();
         this.createPowerUpPanel();
+        this.createEmsPanel();
+        emsFeedbackController.onBatteryChange = (batteryLevel) => this.reportEmsBattery(batteryLevel);
         this.createNetworkBanner();
         this.createTouchControls();
         this.setupHudLayout();
@@ -166,6 +172,10 @@ export class BombermanScene extends Phaser.Scene {
             this.destroyLobbyPanel();
             this.destroyResultPanel();
             this.destroyPowerUpPanel();
+            this.destroyEmsPanel();
+            if (emsFeedbackController.onBatteryChange) {
+                emsFeedbackController.onBatteryChange = undefined;
+            }
             this.destroyMatchPanel();
             this.destroyNetworkBanner();
             this.destroyTouchControls();
@@ -219,6 +229,7 @@ export class BombermanScene extends Phaser.Scene {
                         <p>YOKONEX</p>
                         <h2>多人对战大厅</h2>
                     </div>
+                    <button class="secondary" data-action="ems-config">EMS反馈</button>
                 </header>
 
                 <nav class="lobby-tabs" aria-label="大厅页面">
@@ -389,6 +400,224 @@ export class BombermanScene extends Phaser.Scene {
         }
         this.powerUpPanel?.remove();
         this.powerUpPanel = undefined;
+    }
+
+    createEmsPanel() {
+        const panel = document.createElement("section");
+        panel.className = "ems-panel";
+        panel.hidden = true;
+        panel.addEventListener("click", (event) => void this.handleEmsPanelClick(event));
+        document.body.appendChild(panel);
+        this.emsPanel = panel;
+        this.renderEmsPanel();
+    }
+
+    destroyEmsPanel() {
+        this.emsPanel?.remove();
+        this.emsPanel = undefined;
+    }
+
+    renderEmsPanel() {
+        if (!this.emsPanel) {
+            return;
+        }
+
+        const config = emsFeedbackController.config;
+        this.emsPanel.innerHTML = `
+            <div class="ems-card">
+                <header>
+                    <div>
+                        <p>EMS</p>
+                        <h2>硬件反馈</h2>
+                    </div>
+                    <button class="secondary" data-action="ems-close">关闭</button>
+                </header>
+                <div class="ems-toolbar">
+                    <label class="ems-switch">
+                        <input type="checkbox" data-role="ems-enabled" ${config.enabled ? "checked" : ""} />
+                        启用反馈
+                    </label>
+                    <label class="ems-limit">
+                        强度上限
+                        <input type="number" min="0" max="180" data-role="ems-max-strength" value="${config.maxStrength}" />
+                    </label>
+                    <button data-action="ems-connect">连接EMS</button>
+                    <span data-role="ems-status">${emsFeedbackController.status}</span>
+                </div>
+                <div class="ems-rule-list">
+                    ${config.rules.map((rule) => this.renderEmsRuleRow(rule)).join("")}
+                </div>
+                <div class="ems-actions">
+                    <button data-action="ems-save">保存配置</button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderEmsRuleRow(rule: EmsFeedbackRule) {
+        const eventLabel = EMS_FEEDBACK_EVENT_LABELS[rule.eventType];
+        const stepsText = JSON.stringify(rule.steps, null, 2);
+        return `
+            <section class="ems-rule" data-rule="${rule.eventType}">
+                <div class="ems-rule-title">
+                    <label>
+                        <input type="checkbox" data-field="enabled" ${rule.enabled ? "checked" : ""} />
+                        ${eventLabel}
+                    </label>
+                    <button class="secondary" data-action="ems-test" data-event-type="${rule.eventType}">测试</button>
+                </div>
+                <div class="ems-rule-grid">
+                    <label>方式
+                        <select data-field="action">
+                            <option value="fixed" ${rule.action === "fixed" ? "selected" : ""}>固定强度</option>
+                            <option value="waveform" ${rule.action === "waveform" ? "selected" : ""}>波形</option>
+                        </select>
+                    </label>
+                    <label>A
+                        <input type="number" min="0" max="180" data-field="channelA" value="${rule.channelA}" />
+                    </label>
+                    <label>B
+                        <input type="number" min="0" max="180" data-field="channelB" value="${rule.channelB}" />
+                    </label>
+                    <label>毫秒
+                        <input type="number" min="1" max="5000" data-field="durationMs" value="${rule.durationMs}" />
+                    </label>
+                </div>
+                <textarea data-field="steps" spellcheck="false">${stepsText}</textarea>
+            </section>
+        `;
+    }
+
+    async handleEmsPanelClick(event: Event) {
+        const target = (event.target as HTMLElement).closest<HTMLElement>("[data-action]");
+        if (!target) {
+            return;
+        }
+
+        const action = target.dataset.action;
+        if (action === "ems-close") {
+            this.emsPanel!.hidden = true;
+            return;
+        }
+
+        if (action === "ems-connect") {
+            await this.connectEmsDevice();
+            return;
+        }
+
+        if (action === "ems-save") {
+            this.saveEmsConfigFromPanel();
+            return;
+        }
+
+        if (action === "ems-test") {
+            const config = this.readEmsConfigFromPanel();
+            const eventType = target.dataset.eventType as EmsFeedbackEventType;
+            const rule = config.rules.find((item) => item.eventType === eventType);
+            if (rule) {
+                await this.testEmsRule(rule);
+            }
+        }
+    }
+
+    async connectEmsDevice() {
+        this.setEmsStatus("正在连接...");
+        try {
+            await emsFeedbackController.connect();
+            this.setEmsStatus(emsFeedbackController.status);
+            this.reportEmsBattery(emsFeedbackController.batteryLevel);
+        } catch (error) {
+            this.setEmsStatus(error instanceof Error ? error.message : "EMS连接失败");
+        }
+    }
+
+    async testEmsRule(rule: EmsFeedbackRule) {
+        this.setEmsStatus("正在测试...");
+        try {
+            await emsFeedbackController.test(rule);
+            this.setEmsStatus("测试完成");
+        } catch (error) {
+            this.setEmsStatus(error instanceof Error ? error.message : "EMS测试失败");
+        }
+    }
+
+    saveEmsConfigFromPanel() {
+        try {
+            emsFeedbackController.saveConfig(this.readEmsConfigFromPanel());
+            this.setEmsStatus("已保存");
+            this.renderEmsPanel();
+        } catch (error) {
+            this.setEmsStatus(error instanceof Error ? error.message : "配置保存失败");
+        }
+    }
+
+    readEmsConfigFromPanel(): EmsFeedbackConfig {
+        if (!this.emsPanel) {
+            return emsFeedbackController.config;
+        }
+
+        const enabled = Boolean(this.emsPanel.querySelector<HTMLInputElement>("[data-role='ems-enabled']")?.checked);
+        const maxStrength = Number(this.emsPanel.querySelector<HTMLInputElement>("[data-role='ems-max-strength']")?.value ?? 180);
+        const rules = Object.keys(EMS_FEEDBACK_EVENT_LABELS).map((eventType) => {
+            const ruleEl = this.emsPanel!.querySelector<HTMLElement>(`[data-rule='${eventType}']`)!;
+            const steps = this.readEmsSteps(ruleEl);
+            return {
+                eventType: eventType as EmsFeedbackEventType,
+                enabled: Boolean(ruleEl.querySelector<HTMLInputElement>("[data-field='enabled']")?.checked),
+                action: ruleEl.querySelector<HTMLSelectElement>("[data-field='action']")?.value === "waveform" ? "waveform" : "fixed",
+                channelA: Number(ruleEl.querySelector<HTMLInputElement>("[data-field='channelA']")?.value ?? 0),
+                channelB: Number(ruleEl.querySelector<HTMLInputElement>("[data-field='channelB']")?.value ?? 0),
+                durationMs: Number(ruleEl.querySelector<HTMLInputElement>("[data-field='durationMs']")?.value ?? 200),
+                steps,
+            };
+        });
+
+        return { enabled, maxStrength, rules };
+    }
+
+    readEmsSteps(ruleEl: HTMLElement) {
+        const raw = ruleEl.querySelector<HTMLTextAreaElement>("[data-field='steps']")?.value.trim() ?? "[]";
+        try {
+            const parsed = JSON.parse(raw || "[]");
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            throw new Error("波形格式不是合法JSON");
+        }
+    }
+
+    setEmsStatus(message: string) {
+        emsFeedbackController.status = message;
+        const status = this.emsPanel?.querySelector<HTMLElement>("[data-role='ems-status']");
+        if (status) {
+            status.textContent = `${message} · ${this.formatEmsBattery(emsFeedbackController.batteryLevel)}`;
+        }
+    }
+
+    triggerEmsFeedback(eventType: EmsFeedbackEventType) {
+        // 游戏只发布本地玩家相关事件，避免多人房间里别人的事件误触自己的设备。
+        emsFeedbackController.trigger(eventType);
+    }
+
+    reportEmsBattery(batteryLevel: number) {
+        const normalizedLevel = this.normalizeEmsBatteryForReport(batteryLevel);
+        if (!this.room) {
+            const status = this.emsPanel?.querySelector<HTMLElement>("[data-role='ems-status']");
+            if (status) {
+                status.textContent = `${emsFeedbackController.status} · ${this.formatEmsBattery(normalizedLevel)}`;
+            }
+            return;
+        }
+
+        if (normalizedLevel === this.lastReportedEmsBattery) {
+            return;
+        }
+
+        this.lastReportedEmsBattery = normalizedLevel;
+        this.room.send("updateEmsBattery", normalizedLevel);
+        const status = this.emsPanel?.querySelector<HTMLElement>("[data-role='ems-status']");
+        if (status) {
+            status.textContent = `${emsFeedbackController.status} · ${this.formatEmsBattery(normalizedLevel)}`;
+        }
     }
 
     createNetworkBanner() {
@@ -620,6 +849,9 @@ export class BombermanScene extends Phaser.Scene {
             this.switchLobbyView("rooms");
         } else if (action === "show-create") {
             this.switchLobbyView("create");
+        } else if (action === "ems-config") {
+            this.renderEmsPanel();
+            this.emsPanel!.hidden = false;
         } else if (action === "select-map") {
             this.selectedMapId = target.dataset.mapId ?? this.selectedMapId;
             this.renderMapOptions();
@@ -849,12 +1081,14 @@ export class BombermanScene extends Phaser.Scene {
         this.ratingChanges = [];
         this.lastRoundIntroSecond = 0;
         this.lastRoundStatus = "";
+        this.lastReportedEmsBattery = -2;
         this.playerAliveState = {};
         this.clearGameObjects();
         this.drawArenaFloor();
         this.statusText.setText(`Room: ${room.roomId}`);
         this.setLobbyMessage("");
         this.switchLobbyView("joined");
+        this.reportEmsBattery(emsFeedbackController.batteryLevel);
 
         const $ = getStateCallbacks(room);
 
@@ -862,6 +1096,9 @@ export class BombermanScene extends Phaser.Scene {
             soundManager.play("powerup");
             this.showPowerUpToast(`${message.nickname} 获得 ${message.label}`);
             this.showCombatFeedback(`获得 ${message.label}`, 0x63d2ff);
+            if (message.sessionId === room.sessionId) {
+                this.triggerEmsFeedback("power_up");
+            }
         });
         room.onMessage("ratingChanged", (message: RatingChangedMessage) => {
             this.ratingChanges = message.changes;
@@ -919,6 +1156,7 @@ export class BombermanScene extends Phaser.Scene {
             this.updateRoundStatus(status);
             if (status === "ended" && this.lastRoundStatus !== "ended") {
                 this.showRoundEndFeedback();
+                this.triggerRoundResultEms();
             }
             this.lastRoundStatus = status;
         });
@@ -946,6 +1184,9 @@ export class BombermanScene extends Phaser.Scene {
             entity.setStrokeStyle(4, 0xffd166);
             this.bombEntities[key] = entity;
             soundManager.play("bomb");
+            if (bomb.ownerId === room.sessionId) {
+                this.triggerEmsFeedback("bomb_placed");
+            }
             this.tweens.add({
                 targets: entity,
                 scale: { from: 0.72, to: 1 },
@@ -959,9 +1200,12 @@ export class BombermanScene extends Phaser.Scene {
             });
         });
 
-        $(room.state).bombs.onRemove((_bomb, key) => {
+        $(room.state).bombs.onRemove((bomb, key) => {
             this.bombEntities[key]?.destroy();
             delete this.bombEntities[key];
+            if (bomb.ownerId === room.sessionId) {
+                this.triggerEmsFeedback("bomb_exploded");
+            }
         });
 
         $(room.state).explosions.onAdd((explosion, key) => {
@@ -1023,7 +1267,7 @@ export class BombermanScene extends Phaser.Scene {
                 fontFamily: "Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Microsoft YaHei",
                 fontSize: "20px",
             }).setOrigin(0.5).setDepth(5);
-            const nameLabel = this.add.text(player.x, player.y - 31, player.nickname, {
+            const nameLabel = this.add.text(player.x, player.y - 31, this.playerDisplayName(player.nickname, player.emsBatteryLevel), {
                 color: "#fff5d6",
                 fontFamily: "Microsoft YaHei",
                 fontSize: "12px",
@@ -1053,10 +1297,13 @@ export class BombermanScene extends Phaser.Scene {
                 avatar.alpha = player.alive ? 1 : 0.28;
                 nameLabel.x = player.x;
                 nameLabel.y = player.y - 31;
-                nameLabel.text = player.nickname;
+                nameLabel.text = this.playerDisplayName(player.nickname, player.emsBatteryLevel);
                 nameLabel.alpha = player.alive ? 1 : 0.28;
                 if (this.playerAliveState[sessionId] && !player.alive) {
                     this.showHitFeedback(sessionId, player.nickname);
+                    if (sessionId === room.sessionId) {
+                        this.triggerEmsFeedback("death");
+                    }
                 }
                 this.playerAliveState[sessionId] = player.alive;
                 this.renderLobbyState();
@@ -1433,6 +1680,19 @@ export class BombermanScene extends Phaser.Scene {
         this.showCombatFeedback(message, 0xff7a35);
     }
 
+    triggerRoundResultEms() {
+        if (!this.room) {
+            return;
+        }
+
+        const winnerId = this.room.state.winnerSessionId;
+        if (!winnerId) {
+            return;
+        }
+
+        this.triggerEmsFeedback(winnerId === this.room.sessionId ? "round_win" : "round_lose");
+    }
+
     showHitFeedback(sessionId: string, nickname: string) {
         const entity = this.playerEntities[sessionId];
         soundManager.play("hit");
@@ -1675,6 +1935,25 @@ export class BombermanScene extends Phaser.Scene {
         }
 
         return "🛡️";
+    }
+
+    playerDisplayName(nickname: string, emsBatteryLevel: number) {
+        const batteryText = this.formatEmsBattery(emsBatteryLevel);
+        return batteryText === "EMS --" ? nickname : `${nickname} · ${batteryText}`;
+    }
+
+    formatEmsBattery(batteryLevel: number) {
+        const normalizedLevel = this.normalizeEmsBatteryForReport(batteryLevel);
+        return normalizedLevel >= 0 ? `EMS ${normalizedLevel}%` : "EMS --";
+    }
+
+    normalizeEmsBatteryForReport(batteryLevel: number) {
+        const value = Number(batteryLevel);
+        if (!Number.isFinite(value)) {
+            return -1;
+        }
+
+        return Math.max(-1, Math.min(100, Math.floor(value)));
     }
 
     skinStrokeColor(skinId: string) {

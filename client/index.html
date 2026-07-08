@@ -163,6 +163,136 @@
             backdrop-filter: blur(10px);
         }
         .lobby-view[hidden] { display: none; }
+        .ems-panel {
+            position: fixed;
+            inset: 64px 0 0 0;
+            display: grid;
+            place-items: start center;
+            overflow: auto;
+            padding: 24px 16px 42px;
+            background: rgba(8, 13, 19, 0.72);
+            z-index: 26;
+        }
+        .ems-panel[hidden] { display: none; }
+        .ems-card {
+            width: min(940px, 100%);
+            display: grid;
+            gap: 14px;
+            color: var(--ink);
+            background: rgba(19, 29, 39, 0.98);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 0 0 1px var(--line), var(--shadow);
+        }
+        .ems-card header,
+        .ems-toolbar,
+        .ems-rule-title,
+        .ems-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .ems-card h2 {
+            font-size: 26px;
+            line-height: 1.15;
+        }
+        .ems-card p {
+            color: var(--blue);
+            font-size: 13px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .ems-toolbar {
+            flex-wrap: wrap;
+            padding: 10px;
+            background: rgba(7, 12, 18, 0.52);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+        }
+        .ems-toolbar span {
+            color: var(--muted);
+            font-size: 13px;
+            min-width: min(260px, 100%);
+            text-align: right;
+        }
+        .ems-switch,
+        .ems-limit,
+        .ems-rule-title label,
+        .ems-rule-grid label {
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .ems-switch,
+        .ems-limit,
+        .ems-rule-title label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ems-limit input {
+            width: 76px;
+            color: var(--ink);
+            background: rgba(16, 24, 32, 0.95);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .ems-rule-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 10px;
+        }
+        .ems-rule {
+            display: grid;
+            gap: 10px;
+            padding: 12px;
+            background: rgba(7, 12, 18, 0.48);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+        }
+        .ems-rule-grid {
+            display: grid;
+            grid-template-columns: 1.2fr repeat(3, minmax(64px, 1fr));
+            gap: 8px;
+        }
+        .ems-rule input[type="number"],
+        .ems-rule select,
+        .ems-rule textarea {
+            width: 100%;
+            margin-top: 5px;
+            color: var(--ink);
+            background: rgba(16, 24, 32, 0.95);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .ems-rule textarea {
+            min-height: 128px;
+            resize: vertical;
+            color: #d8ecff;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .ems-card button {
+            cursor: pointer;
+            color: #101820;
+            background: var(--gold);
+            border: 0;
+            border-radius: 8px;
+            padding: 9px 13px;
+            font-weight: 800;
+            min-height: 38px;
+            transition-property: transform, background-color, opacity;
+            transition-duration: 140ms;
+        }
+        .ems-card button.secondary {
+            color: var(--ink);
+            background: #2c3e50;
+            box-shadow: none;
+        }
+        .ems-card button:active { transform: scale(0.96); }
         .lobby-section-title {
             display: flex;
             justify-content: space-between;

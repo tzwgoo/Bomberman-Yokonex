@@ -61,6 +61,7 @@ export class BombermanPlayer extends Schema {
   @type("string") title = DEFAULT_PLAYER_ROLE.title;
   @type("string") avatar = DEFAULT_PLAYER_ROLE.avatar;
   @type("string") skinId = DEFAULT_PLAYER_ROLE.skinId;
+  @type("number") emsBatteryLevel = -1;
   @type("boolean") alive = true;
   @type("boolean") ready = false;
   @type("boolean") isHost = false;
@@ -229,6 +230,16 @@ export class BombermanRoom extends Room {
     this.onMessage("transferHost", (client, targetSessionId: string) => {
       this.transferHost(client.sessionId, targetSessionId);
     });
+
+    this.onMessage("updateEmsBattery", (client, batteryLevel: number) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) {
+        return;
+      }
+
+      // EMS 电量由玩家本机浏览器读取后上报，服务端只做范围校验和房间同步。
+      player.emsBatteryLevel = this.normalizeEmsBatteryLevel(batteryLevel);
+    });
   }
 
   onAuth(_client: Client, options: BombermanJoinOptions = {}) {
@@ -350,7 +361,7 @@ export class BombermanRoom extends Room {
         }
 
         player.tick = input.tick ?? player.tick;
-        this.collectPowerUp(player);
+        this.collectPowerUp(sessionId, player);
       }
     });
 
@@ -569,7 +580,7 @@ export class BombermanRoom extends Room {
     this.state.powerUps.set(this.tileKey(x, y), powerUp);
   }
 
-  collectPowerUp(player: BombermanPlayer) {
+  collectPowerUp(sessionId: string, player: BombermanPlayer) {
     const { tileX, tileY } = this.worldToTile(player.x, player.y);
     const key = this.tileKey(tileX, tileY);
     const powerUp = this.state.powerUps.get(key);
@@ -590,6 +601,7 @@ export class BombermanRoom extends Room {
 
     this.state.powerUps.delete(key);
     this.broadcast("powerUpCollected", {
+      sessionId,
       nickname: player.nickname,
       type: powerUp.type,
       label: POWER_UP_LABELS[powerUp.type as PowerUpType],
@@ -831,6 +843,15 @@ export class BombermanRoom extends Room {
     }
 
     return Math.max(2, Math.min(4, Math.floor(value)));
+  }
+
+  normalizeEmsBatteryLevel(batteryLevel: number) {
+    const value = Number(batteryLevel);
+    if (!Number.isFinite(value)) {
+      return -1;
+    }
+
+    return Math.max(-1, Math.min(100, Math.floor(value)));
   }
 
   async persistMatchResult() {

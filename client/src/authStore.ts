@@ -1,4 +1,5 @@
 import { BACKEND_HTTP_URL } from "./backend";
+import { encryptAuthPayload } from "./authCrypto";
 import { updateProfile, type PlayerProfile } from "./profileStore";
 
 export type AuthUser = {
@@ -109,7 +110,7 @@ async function authRequest(path: string, body: Record<string, string>) {
     const response = await fetch(`${BACKEND_HTTP_URL}${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(encryptAuthPayload(body)),
     });
 
     if (!response.ok) {

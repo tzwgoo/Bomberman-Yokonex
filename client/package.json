@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@colyseus/sdk": "^0.17.0",
-    "phaser": "^3.55.2"
+    "phaser": "^3.55.2",
+    "sm-crypto": "^0.4.0"
   }
 }

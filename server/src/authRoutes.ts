@@ -1,5 +1,6 @@
 import type { Application, Request, Response } from "express";
 
+import { decryptAuthPayload } from "./authCrypto";
 import { AuthError, getUserByToken, loginUser, registerUser, serializeUser, updateUserProfile } from "./authService";
 import { getLeaderboard, getUserStats } from "./matchStatsService";
 
@@ -9,11 +10,11 @@ type AuthedRequest = Request & {
 
 export function registerAuthRoutes(app: Application) {
   app.post("/auth/register", asyncRoute(async (req, res) => {
-    res.json(await registerUser(req.body ?? {}));
+    res.json(await registerUser(decryptAuthPayload(req.body ?? {})));
   }));
 
   app.post("/auth/login", asyncRoute(async (req, res) => {
-    res.json(await loginUser(req.body ?? {}));
+    res.json(await loginUser(decryptAuthPayload(req.body ?? {})));
   }));
 
   app.get("/me", requireAuth, asyncRoute(async (req: AuthedRequest, res) => {
