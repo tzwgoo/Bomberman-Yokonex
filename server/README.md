@@ -1,29 +1,149 @@
-# Welcome to Colyseus!
+# Bomberman Server
 
-This project has been created using [⚔️ `create-colyseus-app`](https://github.com/colyseus/create-colyseus-app/) - an npm init template for kick starting a Colyseus project in TypeScript.
+Bomberman 的 Colyseus 服务端。
 
-[Documentation](http://docs.colyseus.io/)
+负责实时房间、对局结算、登录注册、用户资料、战绩落库、积分段位和排行榜。
 
-## :crossed_swords: Usage
+## 技术栈
 
+- Colyseus
+- Express
+- TypeScript
+- MySQL 8
+- Prisma
+- JWT
+- bcrypt
+
+## 主要能力
+
+- `bomberman_room` 实时对战房间
+- 房间列表、创建房间、加入房间
+- 房间密码、人数上限、准备状态、开局倒计时
+- 房主转让和踢人
+- 地图白名单和随机地图
+- 服务端权威结算对局结果
+- 注册、登录和登录态校验
+- 用户资料保存
+- 对局记录保存
+- 积分、段位、排名和排行榜
+
+## 环境变量
+
+复制模板：
+
+```bash
+copy .env.example .env
 ```
+
+Linux / macOS：
+
+```bash
+cp .env.example .env
+```
+
+示例：
+
+```env
+DATABASE_URL="mysql://root:password@localhost:3306/bomberman_yokonex"
+JWT_SECRET="replace-this-with-a-long-random-secret"
+AUTH_REQUIRED_FOR_ROOMS="0"
+```
+
+说明：
+
+- `DATABASE_URL`：MySQL 连接地址。
+- `JWT_SECRET`：JWT 签名密钥，生产环境必须改成强随机字符串。
+- `AUTH_REQUIRED_FOR_ROOMS`：设为 `1` 时，未登录用户不能进入房间。
+
+## 数据库
+
+创建数据库：
+
+```sql
+CREATE DATABASE bomberman_yokonex
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+生成 Prisma Client：
+
+```bash
+npm run prisma:generate
+```
+
+执行开发迁移：
+
+```bash
+npm run prisma:migrate
+```
+
+生产环境迁移：
+
+```bash
+npm exec prisma migrate deploy
+```
+
+## 启动
+
+开发模式：
+
+```bash
 npm start
 ```
 
-## Structure
+默认端口：
 
-- `index.ts`: main entry point, register an empty room handler and attach [`@colyseus/monitor`](https://github.com/colyseus/colyseus-monitor)
-- `src/rooms/MyRoom.ts`: an empty room handler for you to implement your logic
-- `src/rooms/schema/MyRoomState.ts`: an empty schema used on your room's state.
-- `loadtest/example.ts`: scriptable client for the loadtest tool (see `npm run loadtest`)
-- `package.json`:
-    - `scripts`:
-        - `npm start`: runs `ts-node-dev index.ts`
-        - `npm test`: runs mocha test suite
-        - `npm run loadtest`: runs the [`@colyseus/loadtest`](https://github.com/colyseus/colyseus-loadtest/) tool for testing the connection, using the `loadtest/example.ts` script.
-- `tsconfig.json`: TypeScript configuration file
+```txt
+2567
+```
 
+构建：
 
-## License
+```bash
+npm run build
+```
 
-MIT
+构建产物：
+
+```txt
+build
+```
+
+## 常用接口
+
+- `POST /auth/register`：注册
+- `POST /auth/login`：登录
+- `GET /me`：查询当前用户
+- `PUT /me/profile`：更新个人资料
+- `GET /me/stats`：查询个人战绩和积分
+- `GET /leaderboard`：查询排行榜
+- `GET /rooms/bomberman`：查询房间列表
+- `GET /maps/bomberman`：查询地图列表
+- `GET /monitor`：Colyseus 监控
+
+需要登录的接口使用：
+
+```txt
+Authorization: Bearer <token>
+```
+
+## 积分重算
+
+根据历史对局重算积分：
+
+```bash
+npm run ratings:rebuild
+```
+
+## 测试
+
+```bash
+npm test
+```
+
+项目提交前建议从仓库根目录运行：
+
+```bash
+npm run build
+npm --prefix server test
+```
