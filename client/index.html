@@ -371,6 +371,38 @@
             font-size: 18px;
             font-variant-numeric: tabular-nums;
         }
+        body.hud-side-rail .powerup-panel {
+            top: calc(156px + env(safe-area-inset-top));
+            right: max(18px, env(safe-area-inset-right));
+            bottom: auto;
+            width: 132px;
+        }
+        body.hud-side-rail .powerup-grid {
+            grid-template-columns: 1fr;
+            gap: 6px;
+            padding: 8px;
+        }
+        body.hud-side-rail .powerup-grid span {
+            grid-template-columns: 24px 1fr auto;
+            align-items: center;
+            min-height: 40px;
+            padding: 6px 8px;
+            gap: 6px;
+            text-align: left;
+            background: rgba(255,255,255,0.06);
+            border-radius: 6px;
+        }
+        body.hud-side-rail .powerup-grid i {
+            font-size: 17px;
+        }
+        body.hud-side-rail .powerup-grid strong {
+            font-size: 16px;
+        }
+        body.hud-side-rail .powerup-toast {
+            max-width: 132px;
+            margin: 0 0 8px auto;
+            text-align: center;
+        }
         .powerup-toast {
             width: fit-content;
             max-width: 100%;
@@ -998,10 +1030,34 @@
             }
         }
         @media (orientation: portrait) {
+            body.hud-side-rail .powerup-panel,
             .powerup-panel {
                 right: 12px;
                 bottom: 172px;
+                top: auto;
                 width: min(320px, calc(100vw - 24px));
+            }
+            body.hud-side-rail .powerup-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
+                padding: 10px;
+            }
+            body.hud-side-rail .powerup-grid span {
+                display: grid;
+                grid-template-columns: none;
+                gap: 3px;
+                min-height: 46px;
+                align-content: center;
+                padding: 0;
+                text-align: center;
+                background: transparent;
+                border-radius: 0;
+            }
+            body.hud-side-rail .powerup-grid i {
+                font-size: 20px;
+            }
+            body.hud-side-rail .powerup-grid strong {
+                font-size: 18px;
             }
             .orientation-tip {
                 display: grid;

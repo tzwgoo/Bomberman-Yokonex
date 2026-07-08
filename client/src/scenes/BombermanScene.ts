@@ -84,6 +84,7 @@ export class BombermanScene extends Phaser.Scene {
     soundEnabled = soundManager.isEnabled();
     powerUpToastTimer?: number;
     networkTimer?: number;
+    hudLayoutHandler?: () => void;
     lastRoundIntroSecond = 0;
     lastRoundStatus = "";
     playerAliveState: Record<string, boolean> = {};
@@ -134,10 +135,12 @@ export class BombermanScene extends Phaser.Scene {
         this.createPowerUpPanel();
         this.createNetworkBanner();
         this.createTouchControls();
+        this.setupHudLayout();
         this.startNetworkMonitor();
         this.refreshRoomList();
         this.consumeAutoMatchRequest();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.destroyHudLayout();
             this.destroyLobbyPanel();
             this.destroyResultPanel();
             this.destroyPowerUpPanel();
@@ -330,6 +333,31 @@ export class BombermanScene extends Phaser.Scene {
         `;
         document.body.appendChild(panel);
         this.powerUpPanel = panel;
+    }
+
+    setupHudLayout() {
+        this.hudLayoutHandler = () => this.syncHudLayout();
+        window.addEventListener("resize", this.hudLayoutHandler);
+        this.syncHudLayout();
+        window.requestAnimationFrame(this.hudLayoutHandler);
+    }
+
+    destroyHudLayout() {
+        if (this.hudLayoutHandler) {
+            window.removeEventListener("resize", this.hudLayoutHandler);
+        }
+        document.body.classList.remove("hud-side-rail");
+        this.hudLayoutHandler = undefined;
+    }
+
+    syncHudLayout() {
+        const canvasRect = this.game.canvas.getBoundingClientRect();
+        const railWidth = 132;
+        const safeGap = 18;
+        const rightSpace = window.innerWidth - canvasRect.right;
+
+        // 右侧空间足够时，道具栏贴到地图外侧，避免遮挡战斗区域。
+        document.body.classList.toggle("hud-side-rail", rightSpace >= railWidth + safeGap);
     }
 
     destroyPowerUpPanel() {
