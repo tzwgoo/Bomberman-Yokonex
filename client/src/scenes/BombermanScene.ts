@@ -39,6 +39,19 @@ type PowerUpCollectedMessage = {
     label: string;
 };
 
+type RatingChangedMessage = {
+    matchId: string;
+    changes: {
+        sessionId: string;
+        userId: string;
+        beforeScore: number;
+        delta: number;
+        afterScore: number;
+        tier: string;
+        rank: number;
+    }[];
+};
+
 export class BombermanScene extends Phaser.Scene {
     client = new Client<typeof server>(BACKEND_URL);
     room?: Room<BombermanRoom>;
@@ -93,6 +106,7 @@ export class BombermanScene extends Phaser.Scene {
     recordedMatchRoomId = "";
     matching = false;
     matchCanceled = false;
+    ratingChanges: RatingChangedMessage["changes"] = [];
 
     inputPayload: BombermanInput = {
         left: false,
@@ -308,6 +322,7 @@ export class BombermanScene extends Phaser.Scene {
             <h2 data-role="result-title">比赛结束</h2>
             <p data-role="result-detail"></p>
             <div class="result-scoreboard" data-role="result-scoreboard"></div>
+            <div class="result-rating" data-role="result-rating"></div>
             <button data-action="result-leave">返回大厅</button>
         `;
         panel.addEventListener("click", async (event) => {
@@ -831,6 +846,7 @@ export class BombermanScene extends Phaser.Scene {
         this.room = room;
         this.intentionalLeaving = false;
         this.recordedMatchRoomId = "";
+        this.ratingChanges = [];
         this.lastRoundIntroSecond = 0;
         this.lastRoundStatus = "";
         this.playerAliveState = {};
@@ -846,6 +862,10 @@ export class BombermanScene extends Phaser.Scene {
             soundManager.play("powerup");
             this.showPowerUpToast(`${message.nickname} 获得 ${message.label}`);
             this.showCombatFeedback(`获得 ${message.label}`, 0x63d2ff);
+        });
+        room.onMessage("ratingChanged", (message: RatingChangedMessage) => {
+            this.ratingChanges = message.changes;
+            this.renderResultPanel();
         });
 
         room.onError((_code, message) => {
@@ -1471,6 +1491,7 @@ export class BombermanScene extends Phaser.Scene {
         const title = this.resultPanel.querySelector<HTMLElement>("[data-role='result-title']");
         const detail = this.resultPanel.querySelector<HTMLElement>("[data-role='result-detail']");
         const scoreboard = this.resultPanel.querySelector<HTMLElement>("[data-role='result-scoreboard']");
+        const ratingBoard = this.resultPanel.querySelector<HTMLElement>("[data-role='result-rating']");
 
         if (title) {
             title.textContent = winnerId === this.room.sessionId ? "你赢了" : `${winner?.nickname ?? "玩家"} 获胜`;
@@ -1489,6 +1510,19 @@ export class BombermanScene extends Phaser.Scene {
                     row.className = sessionId === winnerId ? "is-winner" : "";
                     row.innerHTML = `<i>${player.avatar}</i><b>${player.nickname}</b><strong>${player.score}</strong>`;
                     scoreboard.appendChild(row);
+                });
+        }
+
+        if (ratingBoard) {
+            ratingBoard.innerHTML = "";
+            this.ratingChanges
+                .filter((change) => this.room?.state.players.has(change.sessionId))
+                .forEach((change) => {
+                    const player = this.room?.state.players.get(change.sessionId);
+                    const row = document.createElement("span");
+                    row.className = change.delta >= 0 ? "is-up" : "is-down";
+                    row.innerHTML = `<b>${player?.nickname ?? "玩家"}</b><strong>${change.delta >= 0 ? "+" : ""}${change.delta}</strong><em>${change.afterScore} · ${change.tier}</em>`;
+                    ratingBoard.appendChild(row);
                 });
         }
 

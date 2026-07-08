@@ -9,6 +9,7 @@ export type AuthUser = {
     color: string | null;
     roleId: string | null;
     characterKey: string | null;
+    currentScore: number;
 };
 
 export type AuthState = {
@@ -22,7 +23,16 @@ export type RemoteStats = {
     losses: number;
     draws: number;
     score: number;
+    rating: number;
+    rank: number;
+    tier: string;
     winRate: number;
+};
+
+export type LeaderboardEntry = {
+    rank: number;
+    user: AuthUser;
+    stats: RemoteStats;
 };
 
 const STORAGE_KEY = "yokonex:bomberman:auth";
@@ -60,6 +70,15 @@ export async function loginAccount(username: string, password: string) {
 export async function fetchMyStats() {
     const response = await authFetch("/me/stats");
     return await response.json() as { stats: RemoteStats; history: unknown[] };
+}
+
+export async function fetchLeaderboard(limit = 50) {
+    const response = await fetch(`${BACKEND_HTTP_URL}/leaderboard?limit=${limit}`);
+    if (!response.ok) {
+        throw new Error(await errorMessage(response));
+    }
+
+    return await response.json() as { entries: LeaderboardEntry[] };
 }
 
 export async function saveRemoteProfile(profile: Pick<PlayerProfile, "nickname" | "color" | "roleId" | "avatar" | "skinId">) {
@@ -136,4 +155,3 @@ function syncUserToLocalProfile(user: AuthUser) {
         roleId: user.roleId || undefined,
     });
 }
-

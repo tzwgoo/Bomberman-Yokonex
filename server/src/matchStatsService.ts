@@ -6,12 +6,20 @@ export type PlayerStatsDto = {
   losses: number;
   draws: number;
   score: number;
+  rating: number;
+  rank: number;
+  tier: string;
   winRate: number;
 };
 
 export async function getUserStats(userId: string) {
   if (!isDatabaseConfigured()) {
-    return { stats: emptyStats(), history: [] };
+    return { stats: emptyStats(), history: [], ratingChanges: [] };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return { stats: emptyStats(), history: [], ratingChanges: [] };
   }
 
   const rows = await prisma.matchPlayer.findMany({
@@ -24,9 +32,15 @@ export async function getUserStats(userId: string) {
     where: { userId },
     include: { match: true },
   });
+  const ratingChanges = await prisma.ratingChange.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+  const rank = await getUserRank(user.currentScore);
 
   return {
-    stats: buildStats(userId, allRows),
+    stats: buildStats(userId, allRows, user.currentScore, rank),
     history: rows.map((row) => ({
       matchId: row.matchId,
       roomId: row.match.roomId,
@@ -36,6 +50,7 @@ export async function getUserStats(userId: string) {
       won: row.match.winnerUserId === userId,
       endedAt: row.match.endedAt,
     })),
+    ratingChanges,
   };
 }
 
@@ -45,6 +60,11 @@ export async function getLeaderboard(limit = 20) {
   }
 
   const users = await prisma.user.findMany({
+    orderBy: [
+      { currentScore: "desc" },
+      { updatedAt: "asc" },
+    ],
+    take: Math.max(1, Math.min(100, limit)),
     include: {
       matchPlayers: {
         include: { match: true },
@@ -52,9 +72,10 @@ export async function getLeaderboard(limit = 20) {
     },
   });
 
-  // 排行榜直接从已落库比赛聚合，先满足当前规模，后续量大再做缓存表。
+  // 排行榜以当前积分为主，胜场和胜率只是辅助展示。
   return users
-    .map((user) => ({
+    .map((user, index) => ({
+      rank: index + 1,
       user: {
         id: user.id,
         username: user.username,
@@ -63,14 +84,41 @@ export async function getLeaderboard(limit = 20) {
         color: user.color,
         roleId: user.roleId,
       },
-      stats: buildStats(user.id, user.matchPlayers),
+      stats: buildStats(user.id, user.matchPlayers, user.currentScore, index + 1),
     }))
-    .filter((entry) => entry.stats.matches > 0)
-    .sort((a, b) => b.stats.score - a.stats.score || b.stats.wins - a.stats.wins || b.stats.winRate - a.stats.winRate)
-    .slice(0, Math.max(1, Math.min(100, limit)));
+    .filter((entry) => entry.stats.matches > 0 || entry.stats.rating !== 1000);
 }
 
-function buildStats(userId: string, rows: { score: number; match: { winnerUserId: string | null } }[]): PlayerStatsDto {
+export function tierForScore(score: number) {
+  if (score >= 1800) {
+    return "钻石";
+  }
+
+  if (score >= 1500) {
+    return "铂金";
+  }
+
+  if (score >= 1200) {
+    return "黄金";
+  }
+
+  if (score >= 1000) {
+    return "白银";
+  }
+
+  return "青铜";
+}
+
+async function getUserRank(currentScore: number) {
+  return (await prisma.user.count({ where: { currentScore: { gt: currentScore } } })) + 1;
+}
+
+function buildStats(
+  userId: string,
+  rows: { score: number; match: { winnerUserId: string | null } }[],
+  rating: number,
+  rank: number,
+): PlayerStatsDto {
   const matches = rows.length;
   const wins = rows.filter((row) => row.match.winnerUserId === userId).length;
   const draws = rows.filter((row) => !row.match.winnerUserId).length;
@@ -83,6 +131,9 @@ function buildStats(userId: string, rows: { score: number; match: { winnerUserId
     losses,
     draws,
     score,
+    rating,
+    rank,
+    tier: tierForScore(rating),
     winRate: matches ? Math.round((wins / matches) * 100) : 0,
   };
 }
@@ -94,7 +145,9 @@ function emptyStats(): PlayerStatsDto {
     losses: 0,
     draws: 0,
     score: 0,
+    rating: 1000,
+    rank: 0,
+    tier: tierForScore(1000),
     winRate: 0,
   };
 }
-

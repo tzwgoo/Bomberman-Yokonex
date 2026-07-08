@@ -17,9 +17,11 @@ model User {
   color        String?
   roleId       String?       @map("role_id")
   characterKey String?       @map("character_key")
+  currentScore Int           @default(1000) @map("current_score")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
   matchPlayers MatchPlayer[]
+  ratingChanges RatingChange[]
   wonMatches   Match[]       @relation("MatchWinner")
 
   @@map("users")
@@ -38,6 +40,7 @@ model Match {
   createdAt    DateTime      @default(now()) @map("created_at")
   winner       User?         @relation("MatchWinner", fields: [winnerUserId], references: [id])
   players      MatchPlayer[]
+  ratingChanges RatingChange[]
 
   @@index([roomId])
   @@index([winnerUserId])
@@ -62,4 +65,25 @@ model MatchPlayer {
   @@unique([matchId, userId])
   @@index([userId])
   @@map("match_players")
+}
+
+// 积分流水。每个用户每场比赛只允许一条，避免重复结算。
+model RatingChange {
+  id          String   @id @default(cuid())
+  matchId     String   @map("match_id")
+  userId      String   @map("user_id")
+  beforeScore Int      @map("before_score")
+  delta       Int
+  afterScore  Int      @map("after_score")
+  reason      String
+  rank        Int
+  season      String   @default("default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  match       Match    @relation(fields: [matchId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([matchId, userId])
+  @@index([userId])
+  @@index([afterScore])
+  @@map("rating_changes")
 }

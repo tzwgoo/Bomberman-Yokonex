@@ -4,6 +4,7 @@ import { SceneSelector } from "./scenes/SceneSelector";
 import { BombermanScene } from "./scenes/BombermanScene";
 import { ProfileScene } from "./scenes/ProfileScene";
 import { AuthScene } from "./scenes/AuthScene";
+import { LeaderboardScene } from "./scenes/LeaderboardScene";
 import { isLoggedIn } from "./authStore";
 import { soundManager } from "./soundManager";
 
@@ -27,7 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
     },
     pixelArt: true,
     // 正式入口只注册当前可用场景，避免调试关卡从菜单外被直接打开。
-    scene: [AuthScene, SceneSelector, BombermanScene, ProfileScene],
+    scene: [AuthScene, SceneSelector, BombermanScene, ProfileScene, LeaderboardScene],
 };
 
 const game = new Phaser.Game(config);
@@ -45,6 +46,7 @@ document.querySelector<HTMLAnchorElement>("[data-action='main-menu']")?.addEvent
     }
 
     game.scene.stop("profile");
+    game.scene.stop("leaderboard");
     game.scene.stop("auth");
     game.scene.stop("bomberman");
     game.scene.start(isLoggedIn() ? "selector" : "auth");

@@ -40,6 +40,9 @@ export class ProfileScene extends Phaser.Scene {
         const auth = loadAuthState();
         const stats = this.remoteStats ?? this.state.stats;
         const winRate = "winRate" in stats ? stats.winRate : stats.matches ? Math.round((stats.wins / stats.matches) * 100) : 0;
+        const rating = "rating" in stats ? stats.rating : 1000;
+        const tier = "tier" in stats ? stats.tier : "白银";
+        const rank = "rank" in stats ? stats.rank : 0;
         const role = findPlayerRole(profile.roleId);
         const nickname = this.escapeHtml(profile.nickname);
         const title = this.escapeHtml(role.title);
@@ -81,6 +84,9 @@ export class ProfileScene extends Phaser.Scene {
                         <span>失败<strong>${stats.losses}</strong></span>
                         <span>平局<strong>${stats.draws}</strong></span>
                         <span>胜率<strong>${winRate}%</strong></span>
+                        <span>积分<strong>${rating}</strong></span>
+                        <span>段位<strong>${tier}</strong></span>
+                        <span>排名<strong>${rank ? `#${rank}` : "-"}</strong></span>
                     </div>
                     <div class="profile-actions">
                         ${auth ? `<button class="secondary" data-action="refresh-stats">刷新战绩</button>` : `<button class="danger" data-action="reset">重置战绩</button>`}

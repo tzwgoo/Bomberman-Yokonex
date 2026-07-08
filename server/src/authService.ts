@@ -12,6 +12,7 @@ export type AuthUserDto = {
   color: string | null;
   roleId: string | null;
   characterKey: string | null;
+  currentScore: number;
 };
 
 export type AuthRoomUser = {
@@ -152,6 +153,7 @@ export function serializeUser(user: User): AuthUserDto {
     color: user.color,
     roleId: user.roleId,
     characterKey: user.characterKey,
+    currentScore: user.currentScore,
   };
 }
 
@@ -196,4 +198,3 @@ function trimOptional(value: unknown, maxLength: number) {
 function isUniqueError(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
-

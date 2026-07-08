@@ -6,7 +6,7 @@ import { soundManager } from "../soundManager";
 type MenuItem = {
     title: string;
     detail: string;
-    action: "bomberman" | "match" | "profile" | "logout" | "todo";
+    action: "bomberman" | "match" | "profile" | "leaderboard" | "logout" | "todo";
 };
 
 export class SceneSelector extends Phaser.Scene {
@@ -14,6 +14,7 @@ export class SceneSelector extends Phaser.Scene {
         { title: "多人对战", detail: "创建房间或输入房间号加入", action: "bomberman" },
         { title: "随机匹配", detail: "自动寻找在线玩家", action: "match" },
         { title: "个人信息", detail: "查看昵称、积分和战绩", action: "profile" },
+        { title: "积分排行", detail: "查看段位和排行榜", action: "leaderboard" },
         { title: "退出登录", detail: "清除当前账号登录状态", action: "logout" },
         { title: "设备连接", detail: "绑定震动反馈硬件", action: "todo" },
     ];
@@ -32,7 +33,7 @@ export class SceneSelector extends Phaser.Scene {
 
         const sceneKey = window.location.hash.substring(1);
         // 只允许正式入口直达，旧调试场景不再作为外部入口开放。
-        if (sceneKey === "bomberman" || sceneKey === "profile") {
+        if (sceneKey === "bomberman" || sceneKey === "profile" || sceneKey === "leaderboard") {
             this.runScene(sceneKey);
             return;
         }
@@ -149,7 +150,7 @@ export class SceneSelector extends Phaser.Scene {
             } else if (item.action === "bomberman") {
                 window.location.hash = item.action;
                 this.runScene(item.action);
-            } else if (item.action === "profile") {
+            } else if (item.action === "profile" || item.action === "leaderboard") {
                 window.location.hash = item.action;
                 this.runScene(item.action);
             } else if (item.action === "logout") {

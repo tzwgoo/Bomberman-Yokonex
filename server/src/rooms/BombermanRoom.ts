@@ -871,6 +871,19 @@ export class BombermanRoom extends Room {
 
       if (result.skipped) {
         console.log("Match persistence skipped", { roomId: this.roomId, reason: result.reason });
+      } else if ("ratingChanges" in result) {
+        const sessionByUserId = new Map(
+          Array.from(this.state.players.entries())
+            .filter(([, player]) => player.userId)
+            .map(([sessionId, player]) => [player.userId, sessionId]),
+        );
+        this.broadcast("ratingChanged", {
+          matchId: result.matchId,
+          changes: result.ratingChanges.map((change) => ({
+            ...change,
+            sessionId: sessionByUserId.get(change.userId) ?? "",
+          })),
+        });
       }
     } catch (error) {
       console.error("Failed to persist match result", { roomId: this.roomId, error });

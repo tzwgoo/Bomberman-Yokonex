@@ -12,6 +12,7 @@
     "clean": "node node_modules/rimraf/bin lib",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "ratings:rebuild": "tsx src/rebuildRatings.ts",
     "test": "mocha -r tsx test/**_test.ts --exit --timeout 15000"
   },
   "author": "",
