@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户账号和角色资料，替代原来的纯本地个人信息。
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  passwordHash String        @map("password_hash")
+  nickname     String
+  avatar       String?
+  color        String?
+  roleId       String?       @map("role_id")
+  characterKey String?       @map("character_key")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  matchPlayers MatchPlayer[]
+  wonMatches   Match[]       @relation("MatchWinner")
+
+  @@map("users")
+}
+
+// 整场比赛结果。对局过程仍在内存里，结算后统一写入这里。
+model Match {
+  id           String        @id @default(cuid())
+  roomId       String        @map("room_id")
+  mapKey       String        @map("map_key")
+  status       String
+  startedAt    DateTime      @map("started_at")
+  endedAt      DateTime      @map("ended_at")
+  winnerUserId String?       @map("winner_user_id")
+  rawData      Json?         @map("raw_data")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  winner       User?         @relation("MatchWinner", fields: [winnerUserId], references: [id])
+  players      MatchPlayer[]
+
+  @@index([roomId])
+  @@index([winnerUserId])
+  @@map("matches")
+}
+
+// 每个玩家在一场比赛里的成绩，用于历史战绩和排行榜。
+model MatchPlayer {
+  id              String   @id @default(cuid())
+  matchId         String   @map("match_id")
+  userId          String   @map("user_id")
+  nickname        String
+  rank            Int
+  score           Int
+  kills           Int      @default(0)
+  deaths          Int      @default(0)
+  survivedSeconds Int      @default(0) @map("survived_seconds")
+  createdAt       DateTime @default(now()) @map("created_at")
+  match           Match    @relation(fields: [matchId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@unique([matchId, userId])
+  @@index([userId])
+  @@map("match_players")
+}

@@ -1,11 +1,13 @@
 import Phaser from "phaser";
 
+import { clearAuthState, fetchMyStats, loadAuthState, saveRemoteProfile, type RemoteStats } from "../authStore";
 import { findPlayerRole, loadProfileState, PLAYER_ROLES, PROFILE_COLORS, resetPlayerStats, updateProfile, type ProfileState } from "../profileStore";
 import { soundManager } from "../soundManager";
 
 export class ProfileScene extends Phaser.Scene {
     panel?: HTMLElement;
     state: ProfileState = loadProfileState();
+    remoteStats?: RemoteStats;
 
     constructor() {
         super({ key: "profile" });
@@ -15,6 +17,9 @@ export class ProfileScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor(0x0e141b);
         this.drawBackground();
         this.createProfilePanel();
+        if (loadAuthState()) {
+            void this.refreshRemoteStats();
+        }
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroyProfilePanel());
     }
 
@@ -32,8 +37,9 @@ export class ProfileScene extends Phaser.Scene {
 
     createProfilePanel() {
         const profile = this.state.profile;
-        const stats = this.state.stats;
-        const winRate = stats.matches ? Math.round((stats.wins / stats.matches) * 100) : 0;
+        const auth = loadAuthState();
+        const stats = this.remoteStats ?? this.state.stats;
+        const winRate = "winRate" in stats ? stats.winRate : stats.matches ? Math.round((stats.wins / stats.matches) * 100) : 0;
         const role = findPlayerRole(profile.roleId);
         const nickname = this.escapeHtml(profile.nickname);
         const title = this.escapeHtml(role.title);
@@ -47,7 +53,7 @@ export class ProfileScene extends Phaser.Scene {
                     <div>
                         <p>个人信息</p>
                         <h2>${nickname}</h2>
-                        <span>${title} · ${this.escapeHtml(role.name)}</span>
+                        <span>${title} · ${this.escapeHtml(role.name)}${auth ? ` · ${this.escapeHtml(auth.user.username)}` : " · 未登录"}</span>
                     </div>
                 </header>
 
@@ -61,13 +67,14 @@ export class ProfileScene extends Phaser.Scene {
                     <div class="profile-roles" data-role="roles"></div>
                     <div class="profile-actions">
                         <button data-action="save">保存资料</button>
+                        ${auth ? `<button class="secondary" data-action="logout">退出登录</button>` : `<button class="secondary" data-action="login">账号登录</button>`}
                         <button class="secondary" data-action="back">返回菜单</button>
                     </div>
                     <p class="profile-note" data-role="message"></p>
                 </section>
 
                 <section class="profile-card">
-                    <h3>本地战绩</h3>
+                    <h3>${auth ? "账号战绩" : "本地战绩"}</h3>
                     <div class="profile-stats">
                         <span>场次<strong>${stats.matches}</strong></span>
                         <span>胜利<strong>${stats.wins}</strong></span>
@@ -76,7 +83,7 @@ export class ProfileScene extends Phaser.Scene {
                         <span>胜率<strong>${winRate}%</strong></span>
                     </div>
                     <div class="profile-actions">
-                        <button class="danger" data-action="reset">重置战绩</button>
+                        ${auth ? `<button class="secondary" data-action="refresh-stats">刷新战绩</button>` : `<button class="danger" data-action="reset">重置战绩</button>`}
                     </div>
                 </section>
             </div>
@@ -132,7 +139,7 @@ export class ProfileScene extends Phaser.Scene {
         });
     }
 
-    handleProfileClick(event: Event) {
+    async handleProfileClick(event: Event) {
         const target = (event.target as HTMLElement).closest<HTMLElement>("[data-action]");
         if (!target) {
             return;
@@ -143,6 +150,16 @@ export class ProfileScene extends Phaser.Scene {
 
         if (target.dataset.action === "back") {
             this.backToMenu();
+        } else if (target.dataset.action === "login") {
+            window.location.hash = "auth";
+            this.scene.start("auth");
+        } else if (target.dataset.action === "logout") {
+            clearAuthState();
+            this.remoteStats = undefined;
+            this.state = loadProfileState();
+            this.destroyProfilePanel();
+            this.createProfilePanel();
+            this.setMessage("已退出登录");
         } else if (target.dataset.action === "color") {
             this.state.profile.color = target.dataset.color ?? this.state.profile.color;
             this.renderColorOptions();
@@ -156,24 +173,50 @@ export class ProfileScene extends Phaser.Scene {
             this.renderRoleOptions();
             this.updateAvatar();
         } else if (target.dataset.action === "save") {
-            this.saveProfile();
+            await this.saveProfile();
         } else if (target.dataset.action === "reset") {
             this.state = resetPlayerStats();
             this.destroyProfilePanel();
             this.createProfilePanel();
+        } else if (target.dataset.action === "refresh-stats") {
+            await this.refreshRemoteStats();
         }
     }
 
-    saveProfile() {
+    async saveProfile() {
         const nickname = this.panel?.querySelector<HTMLInputElement>("#profile-nickname")?.value ?? this.state.profile.nickname;
         this.state = updateProfile({
             nickname,
             color: this.state.profile.color,
             roleId: this.state.profile.roleId,
         });
+
+        const auth = loadAuthState();
+        if (auth) {
+            await saveRemoteProfile({
+                nickname: this.state.profile.nickname,
+                color: this.state.profile.color,
+                roleId: this.state.profile.roleId,
+                avatar: this.state.profile.avatar,
+                skinId: this.state.profile.skinId,
+            });
+        }
+
         this.destroyProfilePanel();
         this.createProfilePanel();
         this.setMessage("资料已保存");
+    }
+
+    async refreshRemoteStats() {
+        try {
+            const data = await fetchMyStats();
+            this.remoteStats = data.stats;
+            this.destroyProfilePanel();
+            this.createProfilePanel();
+            this.setMessage("战绩已同步");
+        } catch {
+            this.setMessage("战绩同步失败");
+        }
     }
 
     updateAvatar() {

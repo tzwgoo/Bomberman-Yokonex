@@ -612,6 +612,80 @@
             font-size: 26px;
             font-variant-numeric: tabular-nums;
         }
+        .auth-panel {
+            position: fixed;
+            inset: 64px 0 0 0;
+            display: grid;
+            place-items: start center;
+            overflow: auto;
+            padding: 44px 18px 40px;
+            color: var(--ink);
+            background:
+                linear-gradient(90deg, rgba(14, 20, 27, 0.96), rgba(14, 20, 27, 0.88)),
+                radial-gradient(circle at 78% 18%, rgba(99, 210, 255, 0.12), transparent 28%);
+            z-index: 18;
+        }
+        .auth-card {
+            width: min(420px, 100%);
+            display: grid;
+            gap: 10px;
+            padding: 18px;
+            background: rgba(19, 29, 39, 0.92);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px var(--line), var(--shadow);
+        }
+        .auth-card p {
+            color: var(--blue);
+            font-size: 13px;
+            font-weight: 900;
+        }
+        .auth-card h2 {
+            font-size: 30px;
+            line-height: 1.15;
+            text-wrap: balance;
+        }
+        .auth-card label {
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .auth-card input {
+            width: 100%;
+            min-height: 42px;
+            color: var(--ink);
+            background: rgba(7, 12, 18, 0.72);
+            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 8px;
+            padding: 9px 10px;
+        }
+        .auth-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 4px;
+        }
+        .auth-card button {
+            min-height: 40px;
+            padding: 9px 12px;
+            color: #101820;
+            background: var(--gold);
+            border: 0;
+            border-radius: 8px;
+            font-weight: 800;
+            cursor: pointer;
+            transition-property: transform, opacity, background-color;
+            transition-duration: 140ms;
+        }
+        .auth-card button:active { transform: scale(0.96); }
+        .auth-card button.secondary {
+            color: var(--ink);
+            background: #2c3e50;
+        }
+        .auth-card span {
+            min-height: 18px;
+            color: var(--muted);
+            font-size: 13px;
+        }
         .lobby-panel label { display: block; color: var(--muted); font-size: 13px; margin: 0 0 6px; }
         .lobby-panel input[type="text"],
         .lobby-panel input[type="password"] {
@@ -983,6 +1057,7 @@
             #phaser-example { min-height: calc(100vh - 56px); }
             .lobby-panel { top: 56px; padding-top: 18px; }
             .profile-panel { top: 56px; padding-top: 18px; }
+            .auth-panel { top: 56px; padding-top: 24px; }
             .profile-shell { grid-template-columns: 1fr; }
             .profile-header { align-items: flex-start; }
             .lobby-header,
@@ -995,6 +1070,8 @@
             .lobby-row { flex-direction: column; }
             .lobby-actions { justify-content: stretch; }
             .lobby-actions button { flex: 1; }
+            .auth-actions { justify-content: stretch; }
+            .auth-actions button { flex: 1 1 120px; }
             .create-options { grid-template-columns: 1fr; }
             .room-card { align-items: stretch; flex-direction: column; }
             .mini-map-preview { width: 96px; }

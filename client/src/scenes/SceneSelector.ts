@@ -1,11 +1,12 @@
 import Phaser from "phaser";
 
+import { clearAuthState, isLoggedIn, loadAuthState } from "../authStore";
 import { soundManager } from "../soundManager";
 
 type MenuItem = {
     title: string;
     detail: string;
-    action: "bomberman" | "match" | "profile" | "todo";
+    action: "bomberman" | "match" | "profile" | "logout" | "todo";
 };
 
 export class SceneSelector extends Phaser.Scene {
@@ -13,16 +14,22 @@ export class SceneSelector extends Phaser.Scene {
         { title: "多人对战", detail: "创建房间或输入房间号加入", action: "bomberman" },
         { title: "随机匹配", detail: "自动寻找在线玩家", action: "match" },
         { title: "个人信息", detail: "查看昵称、积分和战绩", action: "profile" },
+        { title: "退出登录", detail: "清除当前账号登录状态", action: "logout" },
         { title: "设备连接", detail: "绑定震动反馈硬件", action: "todo" },
     ];
 
     modalLayer?: Phaser.GameObjects.Container;
 
     constructor() {
-        super({ key: "selector", active: true });
+        super({ key: "selector" });
     }
 
     create() {
+        if (!isLoggedIn()) {
+            this.redirectToAuth();
+            return;
+        }
+
         const sceneKey = window.location.hash.substring(1);
         // 只允许正式入口直达，旧调试场景不再作为外部入口开放。
         if (sceneKey === "bomberman" || sceneKey === "profile") {
@@ -30,6 +37,7 @@ export class SceneSelector extends Phaser.Scene {
             return;
         }
 
+        this.syncUserMenuItem();
         this.cameras.main.setBackgroundColor(0x0e141b);
         this.drawBackground();
         this.drawHeader();
@@ -75,6 +83,7 @@ export class SceneSelector extends Phaser.Scene {
     }
 
     drawMenu() {
+        this.syncUserMenuItem();
         this.menuItems.forEach((item, index) => {
             const x = 58 + (index % 2) * 342;
             const y = 230 + Math.floor(index / 2) * 132;
@@ -137,9 +146,14 @@ export class SceneSelector extends Phaser.Scene {
                 window.sessionStorage.setItem("bomberman:auto-match", "1");
                 window.location.hash = "bomberman";
                 this.runScene("bomberman");
-            } else if (item.action === "bomberman" || item.action === "profile") {
+            } else if (item.action === "bomberman") {
                 window.location.hash = item.action;
                 this.runScene(item.action);
+            } else if (item.action === "profile") {
+                window.location.hash = item.action;
+                this.runScene(item.action);
+            } else if (item.action === "logout") {
+                this.logout();
             } else {
                 this.showTodoModal(item.title);
             }
@@ -192,5 +206,28 @@ export class SceneSelector extends Phaser.Scene {
 
     runScene(key: string) {
         this.game.scene.switch("selector", key);
+    }
+
+    redirectToAuth() {
+        window.location.hash = "";
+        this.runScene("auth");
+    }
+
+    logout() {
+        clearAuthState();
+        window.sessionStorage.removeItem("bomberman:auto-match");
+        window.sessionStorage.removeItem("bomberman:auth-redirect");
+        window.location.hash = "";
+        this.scene.start("auth");
+    }
+
+    syncUserMenuItem() {
+        const state = loadAuthState();
+        const item = this.menuItems.find((menuItem) => menuItem.action === "logout");
+        if (!item) {
+            return;
+        }
+
+        item.detail = state ? `${state.user.nickname} · 点击退出` : "清除当前账号登录状态";
     }
 }

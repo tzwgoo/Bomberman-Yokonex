@@ -16,6 +16,9 @@
 - 第一版先做 2-4 人实时对战。
 - 先保证房间、玩法、同步稳定，再做美术和运营功能。
 - 服务端优先做权威结算，避免客户端作弊和状态不一致。
+- 用户、登录注册、战绩和排行榜统一接入 MySQL。
+- 服务端通过 Prisma 管理数据库表结构、迁移和查询。
+- 对局过程中仍以内存状态为主，对局结束后一次性写入数据库。
 - 硬件反馈先做事件层，不一开始绑定具体设备。
 
 ## 开发执行规范
@@ -83,6 +86,7 @@ npm --prefix server test
 - 阶段 9 战斗体验打磨
 - 阶段 10 音效系统
 - 阶段 11 移动端适配增强
+- 本地个人信息和本地战绩将迁移到 MySQL
 
 验证方式：
 
@@ -352,7 +356,102 @@ npm --prefix server test
 - 触摸移动和放炸弹稳定。
 - 主菜单、大厅、个人信息页在手机上不溢出。
 
-## 阶段 12：设备连接和硬件反馈
+## 阶段 12：账号系统和数据持久化
+
+目标：把本地用户信息、登录注册、对局结果和战绩接入数据库。
+
+技术选择：
+
+- 数据库：MySQL 8
+- ORM：Prisma
+- 密码加密：bcrypt
+- 登录凭证：JWT
+- 数据写入策略：对局中不频繁写库，对局结束后统一落库
+
+开发内容：
+
+- 安装并配置 Prisma
+- 新增 MySQL 连接配置
+- 新增数据库迁移脚本
+- 新增用户表 `users`
+- 新增对局表 `matches`
+- 新增对局玩家表 `match_players`
+- 新增注册接口
+- 新增登录接口
+- 新增登录态校验中间件
+- 本地个人信息迁移到服务端用户资料
+- 本地战绩迁移到服务端战绩查询
+- 对局结束后保存对局结果
+- 新增个人战绩查询接口
+- 新增排行榜查询接口
+- 客户端接入登录 / 注册页面
+- 客户端保存登录态
+- 未登录时限制进入联机功能
+
+建议表结构：
+
+```txt
+users
+- id
+- username
+- password_hash
+- nickname
+- avatar
+- character_key
+- created_at
+- updated_at
+
+matches
+- id
+- room_id
+- map_key
+- status
+- started_at
+- ended_at
+- winner_user_id
+- raw_data
+- created_at
+
+match_players
+- id
+- match_id
+- user_id
+- nickname
+- rank
+- score
+- kills
+- deaths
+- survived_seconds
+- created_at
+```
+
+验收标准：
+
+- 用户可以注册账号。
+- 用户可以登录账号。
+- 密码不会明文入库。
+- 登录后能进入联机功能。
+- 未登录用户不能直接进入需要账号的联机流程。
+- 对局结束后能写入 `matches` 和 `match_players`。
+- 个人信息从数据库读取和保存。
+- 历史战绩从数据库查询。
+- 排行榜可以按胜场、积分或胜率查询。
+- 数据库连接失败时服务端有明确错误日志。
+- `npm run build` 通过。
+- `npm --prefix server test` 通过。
+
+建议实现顺序：
+
+1. 配置 MySQL、Prisma 和环境变量。
+2. 设计并生成 `users`、`matches`、`match_players` 表。
+3. 实现注册、登录和登录态校验。
+4. 客户端接入登录 / 注册流程。
+5. 对局结束时保存比赛结果。
+6. 接入个人信息、历史战绩和排行榜查询。
+7. 补充服务端测试。
+8. 运行 `npm run build`、`npm --prefix server test`。
+
+## 阶段 13：设备连接和硬件反馈
 
 目标：先做模拟连接，再接真实设备。
 
@@ -382,7 +481,7 @@ npm --prefix server test
 - 后续接 BLE 时不需要改核心玩法。
 - Android / iOS 接入真实设备后不影响普通 Web 玩法。
 
-## 阶段 13：Capacitor App
+## 阶段 14：Capacitor App
 
 目标：打包成 Android / iOS App。
 
@@ -403,7 +502,7 @@ npm --prefix server test
 - App 能连接测试服。
 - WebSocket 正常。
 
-## 阶段 14：上线前准备
+## 阶段 15：上线前准备
 
 目标：准备内测。
 
@@ -429,13 +528,13 @@ npm --prefix server test
 
 当前最高优先级：
 
-1. 阶段 12：设备连接和硬件反馈
-2. 阶段 13：Capacitor App
-3. 阶段 14：上线前准备
+1. 阶段 12：账号系统和数据持久化
+2. 阶段 13：设备连接和硬件反馈
+3. 阶段 14：Capacitor App
+4. 阶段 15：上线前准备
 
 暂时不做：
 
-- 账号系统
 - 充值系统
 - 排位赛
 - 好友系统
@@ -444,11 +543,12 @@ npm --prefix server test
 
 ## 下一步任务
 
-建议下一次从阶段 12 “设备连接和硬件反馈”开始：
+建议下一次从阶段 12 “账号系统和数据持久化”开始：
 
-1. 新增设备连接页面。
-2. 增加模拟连接状态。
-3. 新增 `FeedbackEvent` 类型。
-4. 接入炸弹、爆炸、受击、死亡、道具、胜负反馈事件。
-5. 客户端统一分发反馈事件。
-6. 运行 `npm run build`、`npm --prefix server test`。
+1. 安装并配置 Prisma。
+2. 配置 MySQL 连接环境变量。
+3. 新增 `users`、`matches`、`match_players` 表。
+4. 实现注册、登录和登录态校验。
+5. 对局结束后保存比赛结果。
+6. 接入个人信息、历史战绩和排行榜查询。
+7. 运行 `npm run build`、`npm --prefix server test`。

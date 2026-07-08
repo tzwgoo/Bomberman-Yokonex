@@ -1,4 +1,5 @@
 import { defineServer, defineRoom, matchMaker, monitor, playground } from "colyseus";
+import express from "express";
 
 /**
  * Import your Room files
@@ -9,6 +10,7 @@ import { Part3Room } from "./rooms/Part3Room";
 import { Part4Room } from "./rooms/Part4Room";
 import { BombermanRoom } from "./rooms/BombermanRoom";
 import { BOMBERMAN_MAPS } from "./rooms/BombermanMaps";
+import { registerAuthRoutes } from "./authRoutes";
 
 const server = defineServer({
     rooms: {
@@ -23,6 +25,9 @@ const server = defineServer({
         /**
          * Bind your custom express routes here:
          */
+        app.use(express.json());
+        registerAuthRoutes(app);
+
         app.get("/hello", (req, res) => {
             res.send("Bomberman Yokonex server is running.");
         });

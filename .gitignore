@@ -6,3 +6,4 @@ build
 .devmode.json
 *.log
 tmp-*.png
+.env

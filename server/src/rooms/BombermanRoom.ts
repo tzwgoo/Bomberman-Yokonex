@@ -1,6 +1,8 @@
 import { Client, Room } from "colyseus";
 import { MapSchema, Schema, type } from "@colyseus/schema";
 
+import { verifyAuthToken, type AuthRoomUser } from "../authService";
+import { saveMatchResult } from "../matchPersistence";
 import { DEFAULT_BOMBERMAN_MAP_ID, resolveBombermanMap, type BombermanMapDefinition } from "./BombermanMaps";
 
 export interface BombermanInput {
@@ -20,6 +22,7 @@ export interface BombermanJoinOptions {
   maxClients?: number;
   color?: string;
   roleId?: string;
+  token?: string;
 }
 
 type PowerUpType = "bomb" | "range" | "speed" | "shield";
@@ -52,6 +55,7 @@ export class BombermanPlayer extends Schema {
   @type("number") y = 0;
   @type("number") tick = 0;
   @type("string") color = "#f6c453";
+  @type("string") userId = "";
   @type("string") nickname = "玩家";
   @type("string") roleId = DEFAULT_PLAYER_ROLE.id;
   @type("string") title = DEFAULT_PLAYER_ROLE.title;
@@ -152,6 +156,8 @@ export class BombermanRoom extends Room {
   privateRoom = false;
   roomPassword = "";
   selectedMap: BombermanMapDefinition = resolveBombermanMap();
+  matchStartedAt = new Date();
+  matchPersisted = false;
 
   onCreate(options: BombermanJoinOptions = {}) {
     this.maxClients = this.normalizeMaxClients(options.maxClients);
@@ -226,12 +232,17 @@ export class BombermanRoom extends Room {
   }
 
   onAuth(_client: Client, options: BombermanJoinOptions = {}) {
-    if (!this.roomPassword) {
-      return true;
+    if (this.roomPassword && this.normalizePassword(options.password) !== this.roomPassword) {
+      return false;
     }
 
-    // 密码只在服务端校验，不写入同步状态，避免其他玩家看到明文密码。
-    return this.normalizePassword(options.password) === this.roomPassword;
+    const authUser = verifyAuthToken(options.token);
+    if (authUser) {
+      return authUser;
+    }
+
+    // 开发测试默认允许游客进房；正式服可用环境变量强制房间必须登录。
+    return process.env.AUTH_REQUIRED_FOR_ROOMS === "1" ? false : true;
   }
 
   onJoin(client: Client, options: BombermanJoinOptions = {}) {
@@ -241,8 +252,10 @@ export class BombermanRoom extends Room {
     player.x = this.tileToWorldX(spawn.tileX);
     player.y = this.tileToWorldY(spawn.tileY);
     const role = this.findPlayerRole(options.roleId);
+    const authUser = this.clientAuth(client);
     player.color = this.normalizeColor(options.color, spawn.color);
-    player.nickname = this.normalizeNickname(options.nickname);
+    player.userId = authUser?.userId ?? "";
+    player.nickname = this.normalizeNickname(authUser?.nickname || options.nickname);
     player.roleId = role.id;
     player.title = role.title;
     player.avatar = role.avatar;
@@ -603,6 +616,7 @@ export class BombermanRoom extends Room {
         if (winner.score >= TARGET_SCORE) {
           this.state.matchStatus = "settled";
           this.state.matchWinnerSessionId = winnerSessionId;
+          void this.persistMatchResult();
         }
       }
     }
@@ -715,6 +729,8 @@ export class BombermanRoom extends Room {
     if (this.state.countdownMs <= 0) {
       this.state.phase = "playing";
       this.lock();
+      this.matchStartedAt = new Date();
+      this.matchPersisted = false;
       this.resetScores();
       this.resetRound();
       this.updateRoomMetadata();
@@ -815,5 +831,54 @@ export class BombermanRoom extends Room {
     }
 
     return Math.max(2, Math.min(4, Math.floor(value)));
+  }
+
+  async persistMatchResult() {
+    if (this.matchPersisted) {
+      return;
+    }
+
+    this.matchPersisted = true;
+    const winner = this.state.players.get(this.state.matchWinnerSessionId);
+    const endedAt = new Date();
+
+    try {
+      const result = await saveMatchResult({
+        roomId: this.roomId,
+        mapKey: this.state.mapId,
+        startedAt: this.matchStartedAt,
+        endedAt,
+        winnerUserId: winner?.userId || undefined,
+        players: Array.from(this.state.players.entries()).map(([sessionId, player]) => ({
+          sessionId,
+          userId: player.userId,
+          nickname: player.nickname,
+          score: player.score,
+          alive: player.alive,
+        })),
+        rawData: {
+          roundNumber: this.state.roundNumber,
+          targetScore: TARGET_SCORE,
+          winnerSessionId: this.state.matchWinnerSessionId,
+          players: Array.from(this.state.players.entries()).map(([sessionId, player]) => ({
+            sessionId,
+            userId: player.userId,
+            nickname: player.nickname,
+            score: player.score,
+          })),
+        },
+      });
+
+      if (result.skipped) {
+        console.log("Match persistence skipped", { roomId: this.roomId, reason: result.reason });
+      }
+    } catch (error) {
+      console.error("Failed to persist match result", { roomId: this.roomId, error });
+    }
+  }
+
+  clientAuth(client: Client) {
+    const auth = (client as Client & { auth?: AuthRoomUser | boolean }).auth;
+    return typeof auth === "object" ? auth : null;
   }
 }

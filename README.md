@@ -51,3 +51,7 @@ npm run dev:client
 ## 后续计划
 
 见 [docs/development-plan.md](docs/development-plan.md)。
+
+## 部署
+
+见 [docs/deployment.md](docs/deployment.md)。

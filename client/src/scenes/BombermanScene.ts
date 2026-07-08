@@ -3,6 +3,7 @@ import { Client, Room, getStateCallbacks } from "@colyseus/sdk";
 
 import { BACKEND_HTTP_URL, BACKEND_URL } from "../backend";
 import { BOMBERMAN_MAP_OPTIONS, type BombermanMapOption } from "../bombermanMaps";
+import { isLoggedIn, loadAuthState } from "../authStore";
 import { loadProfileState, recordMatchResult, type PlayerProfile } from "../profileStore";
 import { soundManager } from "../soundManager";
 
@@ -111,6 +112,13 @@ export class BombermanScene extends Phaser.Scene {
     }
 
     create() {
+        if (!isLoggedIn()) {
+            window.sessionStorage.setItem("bomberman:auth-redirect", "bomberman");
+            window.location.hash = "auth";
+            this.scene.start("auth");
+            return;
+        }
+
         this.cameras.main.setBackgroundColor(0x17202a);
         this.cursorKeys = this.input.keyboard.createCursorKeys();
         this.wasdKeys = this.input.keyboard.addKeys("W,A,S,D,SPACE") as Record<string, Phaser.Input.Keyboard.Key>;
@@ -1582,12 +1590,14 @@ export class BombermanScene extends Phaser.Scene {
         return loadProfileState().profile.nickname;
     }
 
-    profilePayload(): Pick<PlayerProfile, "nickname" | "color" | "roleId"> {
+    profilePayload(): Pick<PlayerProfile, "nickname" | "color" | "roleId"> & { token?: string } {
         const profile = loadProfileState().profile;
+        const auth = loadAuthState();
         return {
             nickname: profile.nickname,
             color: profile.color,
             roleId: profile.roleId,
+            token: auth?.token,
         };
     }
 
