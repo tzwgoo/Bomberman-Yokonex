@@ -84,9 +84,9 @@ npm run dev:client
 
 默认地址：
 
-- 服务端：http://localhost:2567
-- 客户端：http://localhost:1234
-- Colyseus 监控：http://localhost:2567/monitor
+- 服务端：http://localhost:45170
+- 客户端：http://localhost:45179
+- Colyseus 监控：http://localhost:45170/monitor
 
 ## 常用命令
 

@@ -4,9 +4,9 @@
   "type": "module",
   "description": "Bomberman Yokonex Phaser client.",
   "scripts": {
-    "start": "vite",
+    "start": "vite --host 0.0.0.0 --port 45179",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host 0.0.0.0 --port 45179"
   },
   "keywords": [
     "colyseus",

@@ -139,8 +139,8 @@ mysql -uroot -p < docs/mysql-init.sql
 在 `client` 目录创建 `.env.production`：
 
 ```env
-VITE_BACKEND_WS_URL="ws://192.168.1.10:5173"
-VITE_BACKEND_HTTP_URL="http://192.168.1.10:5173"
+VITE_BACKEND_WS_URL="ws://192.168.1.10:45170"
+VITE_BACKEND_HTTP_URL="http://192.168.1.10:45170"
 VITE_AUTH_SM4_KEY="0123456789abcdeffedcba9876543210"
 VITE_AUTH_SM4_IV="fedcba98765432100123456789abcdef"
 ```
@@ -169,20 +169,20 @@ client/dist
 Windows PowerShell：
 
 ```powershell
-$env:PORT="5173"
+$env:PORT="45170"
 node server/build/index.js
 ```
 
 Linux / macOS：
 
 ```bash
-PORT=5173 node server/build/index.js
+PORT=45170 node server/build/index.js
 ```
 
 后端验证：
 
 ```bash
-curl http://192.168.1.10:5173/hello
+curl http://192.168.1.10:45170/hello
 ```
 
 应该返回：
@@ -196,20 +196,20 @@ Bomberman Yokonex server is running.
 简单方式：
 
 ```bash
-npm --prefix client exec vite preview -- --host 0.0.0.0 --port 5174
+npm --prefix client exec vite preview -- --host 0.0.0.0 --port 45179
 ```
 
 访问：
 
 ```txt
-http://192.168.1.10:5174
+http://192.168.1.10:45179
 ```
 
 如果服务器有防火墙，需要放行：
 
 ```txt
-5173 后端端口
-5174 前端端口
+45170 后端端口
+45179 前端端口
 ```
 
 ### 7.5 无域名的 EMS 设备限制
@@ -222,7 +222,7 @@ EMS 设备连接使用浏览器 Web Bluetooth。
 - `http://127.0.0.1`
 - `https://域名`
 
-如果你用 `http://服务器IP:5174` 访问，很多浏览器不会允许 Web Bluetooth。
+如果你用 `http://服务器IP:45179` 访问，很多浏览器不会允许 Web Bluetooth。
 
 结论：
 
@@ -270,13 +270,13 @@ npm run build
 后端监听本机端口：
 
 ```bash
-PORT=5173 node server/build/index.js
+PORT=45170 node server/build/index.js
 ```
 
 使用 PM2：
 
 ```bash
-PORT=5173 pm2 start server/build/index.js --name bomberman-server
+PORT=45170 pm2 start server/build/index.js --name bomberman-server
 pm2 save
 ```
 
@@ -303,37 +303,37 @@ server {
     }
 
     location /auth/ {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:45170;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
     location /me {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:45170;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
     location /leaderboard {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:45170;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
     location /rooms/ {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:45170;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
     location /maps/ {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:45170;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
     location /matchmake/ {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:45170;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header Upgrade $http_upgrade;
@@ -380,7 +380,7 @@ server {
     server_name api.example.com;
 
     location / {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:45170;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -395,7 +395,7 @@ server {
 ### 10.1 服务端
 
 ```bash
-curl http://127.0.0.1:5173/hello
+curl http://127.0.0.1:45170/hello
 ```
 
 ### 10.2 数据库
@@ -438,8 +438,8 @@ npm --prefix server exec prisma migrate status
 检查前端构建时的地址：
 
 ```env
-VITE_BACKEND_HTTP_URL="http://服务器IP:5173"
-VITE_BACKEND_WS_URL="ws://服务器IP:5173"
+VITE_BACKEND_HTTP_URL="http://服务器IP:45170"
+VITE_BACKEND_WS_URL="ws://服务器IP:45170"
 ```
 
 如果改过 `.env.production`，需要重新执行：

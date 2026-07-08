@@ -32,7 +32,7 @@ Bomberman 的 Phaser 客户端。
 客户端地址在 `src/backend.ts` 中自动判断：
 
 ```txt
-localhost 访问：连接 ws://localhost:2567
+localhost 访问：连接 ws://localhost:45170
 非 localhost 访问：连接当前域名
 ```
 
