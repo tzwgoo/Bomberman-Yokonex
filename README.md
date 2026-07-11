@@ -126,6 +126,7 @@ CREATE DATABASE bomberman_yokonex
 - 游戏增量部署：[docs/incremental-deployment.md](docs/incremental-deployment.md)
 - DG-LAB WebSocket 后端部署：[docs/dglab-websocket-backend-deployment.md](docs/dglab-websocket-backend-deployment.md)
 - commandId 与游戏事件映射：[docs/command-id-event-mapping.md](docs/command-id-event-mapping.md)
+- EMS 在线设备管理：[docs/ems-device-admin.md](docs/ems-device-admin.md)
 - 参考项目：[docs/references.md](docs/references.md)
 
 ## 部署

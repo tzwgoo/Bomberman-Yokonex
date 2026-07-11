@@ -37,7 +37,7 @@ export class SceneSelector extends Phaser.Scene {
 
         const sceneKey = window.location.hash.substring(1);
         // 只允许正式入口直达，旧调试场景不再作为外部入口开放。
-        if (sceneKey === "bomberman" || sceneKey === "profile" || sceneKey === "leaderboard") {
+        if (sceneKey === "bomberman" || sceneKey === "profile" || sceneKey === "leaderboard" || sceneKey === "admin-device") {
             this.runScene(sceneKey);
             return;
         }
@@ -89,6 +89,27 @@ export class SceneSelector extends Phaser.Scene {
             fontFamily: "Microsoft YaHei",
             fontSize: "16px",
         });
+
+        if (loadAuthState()?.user.isAdmin) {
+            const adminButton = this.add.rectangle(624, 74, 120, 42, 0x2c3e50, 1)
+                .setOrigin(0)
+                .setStrokeStyle(1, 0x63d2ff, 0.72)
+                .setInteractive({ useHandCursor: true });
+            const adminLabel = this.add.text(684, 95, "设备后台", {
+                color: "#fff5d6",
+                fontFamily: "Microsoft YaHei",
+                fontSize: "16px",
+                fontStyle: "bold",
+            }).setOrigin(0.5);
+            adminButton.on("pointerup", () => {
+                soundManager.play("button");
+                window.location.hash = "admin-device";
+                this.runScene("admin-device");
+            });
+            adminButton.on("pointerover", () => adminButton.setStrokeStyle(1, 0xf6c453, 0.9));
+            adminButton.on("pointerout", () => adminButton.setStrokeStyle(1, 0x63d2ff, 0.72));
+            adminLabel.setDepth(adminButton.depth + 1);
+        }
     }
 
     drawMenu() {

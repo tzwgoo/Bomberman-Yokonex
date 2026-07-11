@@ -2,6 +2,7 @@ import { Client, Room } from "colyseus";
 import { MapSchema, Schema, type } from "@colyseus/schema";
 
 import { verifyAuthToken, type AuthRoomUser } from "../authService.js";
+import { recordDeviceAdminResult, registerOnlineDevice, unregisterOnlineDevice, updateOnlineDevice } from "../deviceAdminService.js";
 import { saveMatchResult } from "../matchPersistence.js";
 import { DEFAULT_BOMBERMAN_MAP_ID, resolveBombermanMap, type BombermanMapDefinition } from "./BombermanMaps.js";
 
@@ -240,6 +241,24 @@ export class BombermanRoom extends Room {
       // EMS 电量由玩家本机浏览器读取后上报，服务端只做范围校验和房间同步。
       player.emsBatteryLevel = this.normalizeEmsBatteryLevel(batteryLevel);
     });
+
+    this.onMessage("updateEmsDevice", (client, input: Record<string, unknown>) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player?.userId) {
+        return;
+      }
+
+      updateOnlineDevice(player.userId, this.roomId, client.sessionId, client, input ?? {});
+    });
+
+    this.onMessage("adminEmsCommandResult", (client, input: Record<string, unknown>) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player?.userId) {
+        return;
+      }
+
+      recordDeviceAdminResult(player.userId, input ?? {});
+    });
   }
 
   onAuth(_client: Client, options: BombermanJoinOptions = {}) {
@@ -274,11 +293,25 @@ export class BombermanRoom extends Room {
     player.isHost = this.state.players.size === 0;
 
     this.state.players.set(client.sessionId, player);
+    if (authUser) {
+      registerOnlineDevice({
+        userId: authUser.userId,
+        username: authUser.username,
+        nickname: player.nickname,
+        roomId: this.roomId,
+        sessionId: client.sessionId,
+        client,
+      });
+    }
     this.updateRoomMetadata();
     console.log("Bomberman joined", { roomId: this.roomId, sessionId: client.sessionId });
   }
 
   onLeave(client: Client) {
+    const player = this.state.players.get(client.sessionId);
+    if (player?.userId) {
+      unregisterOnlineDevice(player.userId, this.roomId, client.sessionId);
+    }
     this.state.players.delete(client.sessionId);
     this.cancelCountdownIfNeeded();
     this.ensureHost();

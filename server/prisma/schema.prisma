@@ -87,3 +87,24 @@ model RatingChange {
   @@index([afterScore])
   @@map("rating_changes")
 }
+
+// 管理员对在线 EMS 设备的操作与客户端执行结果。
+model EmsDeviceLog {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  adminUserId String?  @map("admin_user_id")
+  roomId      String?  @map("room_id")
+  category    String
+  action      String
+  transport   String?
+  status      String?
+  success     Boolean?
+  message     String?
+  detail      Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([adminUserId, createdAt])
+  @@index([category, createdAt])
+  @@map("ems_device_logs")
+}

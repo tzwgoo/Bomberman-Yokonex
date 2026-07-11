@@ -201,9 +201,12 @@ JWT_SECRET="生产环境密钥"
 AUTH_REQUIRED_FOR_ROOMS="1"
 AUTH_SM4_KEY="与客户端一致的32位十六进制密钥"
 AUTH_SM4_IV="与客户端一致的32位十六进制向量"
+ADMIN_USERNAMES="admin"
 ```
 
 不要用 `.env.example` 覆盖现有 `server/.env`。
+
+`ADMIN_USERNAMES` 用于控制 [EMS 在线设备管理](ems-device-admin.md) 权限。升级后管理员需要重新登录，主菜单才会显示设备后台入口。
 
 ### 9.2 客户端
 

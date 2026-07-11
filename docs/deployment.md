@@ -93,6 +93,7 @@ JWT_SECRET="请改成一段足够长的随机字符串"
 AUTH_REQUIRED_FOR_ROOMS="1"
 AUTH_SM4_KEY="0123456789abcdeffedcba9876543210"
 AUTH_SM4_IV="fedcba98765432100123456789abcdef"
+ADMIN_USERNAMES="admin"
 ```
 
 说明：
@@ -102,6 +103,7 @@ AUTH_SM4_IV="fedcba98765432100123456789abcdef"
 - `AUTH_REQUIRED_FOR_ROOMS`：设为 `1` 后，未登录用户不能进房间。
 - `AUTH_SM4_KEY`：注册 / 登录请求 SM4 解密密钥，必须是 32 位十六进制。
 - `AUTH_SM4_IV`：注册 / 登录请求 SM4 CBC IV，必须是 32 位十六进制。
+- `ADMIN_USERNAMES`：允许进入 EMS 设备后台的账号名，多个账号用英文逗号分隔。
 
 `AUTH_SM4_KEY` 和 `AUTH_SM4_IV` 必须和前端构建配置保持一致。
 
@@ -252,6 +254,12 @@ server {
     }
 
     location /leaderboard {
+        proxy_pass http://127.0.0.1:45170;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /admin/ {
         proxy_pass http://127.0.0.1:45170;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -423,6 +431,12 @@ server {
     }
 
     location /leaderboard {
+        proxy_pass http://127.0.0.1:45170;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /admin/ {
         proxy_pass http://127.0.0.1:45170;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

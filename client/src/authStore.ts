@@ -11,6 +11,7 @@ export type AuthUser = {
     roleId: string | null;
     characterKey: string | null;
     currentScore: number;
+    isAdmin: boolean;
 };
 
 export type AuthState = {

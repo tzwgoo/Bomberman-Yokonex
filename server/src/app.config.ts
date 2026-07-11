@@ -11,6 +11,7 @@ import { Part4Room } from "./rooms/Part4Room.js";
 import { BombermanRoom } from "./rooms/BombermanRoom.js";
 import { BOMBERMAN_MAPS } from "./rooms/BombermanMaps.js";
 import { registerAuthRoutes } from "./authRoutes.js";
+import { registerDeviceAdminRoutes } from "./deviceAdminRoutes.js";
 
 const server = defineServer({
     rooms: {
@@ -27,6 +28,7 @@ const server = defineServer({
          */
         app.use(express.json());
         registerAuthRoutes(app);
+        registerDeviceAdminRoutes(app);
 
         app.get("/hello", (req, res) => {
             res.send("Bomberman Yokonex server is running.");

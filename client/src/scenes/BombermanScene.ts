@@ -54,6 +54,12 @@ type RatingChangedMessage = {
     }[];
 };
 
+type AdminEmsCommand = {
+    requestId: string;
+    action: "event" | "disconnect";
+    eventType?: EmsFeedbackEventType;
+};
+
 export class BombermanScene extends Phaser.Scene {
     client = new Client<typeof server>(BACKEND_URL);
     room?: Room<BombermanRoom>;
@@ -572,6 +578,7 @@ export class BombermanScene extends Phaser.Scene {
 
     handleEmsConnectionChange() {
         this.syncEmsConnectionButton();
+        this.reportEmsDeviceState();
         if (emsFeedbackController.connected || !this.room || this.room.state.phase !== "lobby") {
             return;
         }
@@ -650,6 +657,55 @@ export class BombermanScene extends Phaser.Scene {
         emsFeedbackController.trigger(eventType);
     }
 
+    reportEmsDeviceState() {
+        if (!this.room) {
+            return;
+        }
+
+        this.room.send("updateEmsDevice", {
+            connected: emsFeedbackController.connected,
+            transport: emsFeedbackController.config.connection.transport,
+            status: emsFeedbackController.status,
+            batteryLevel: emsFeedbackController.batteryLevel,
+        });
+    }
+
+    async handleAdminEmsCommand(room: Room<BombermanRoom>, command: AdminEmsCommand) {
+        if (this.room !== room || !command.requestId) {
+            return;
+        }
+
+        try {
+            if (!emsFeedbackController.connected) {
+                throw new Error("设备未连接");
+            }
+
+            if (command.action === "disconnect") {
+                await emsFeedbackController.disconnect();
+            } else {
+                const rule = emsFeedbackController.config.rules.find((item) => item.eventType === command.eventType);
+                if (!rule) {
+                    throw new Error("不支持的设备事件");
+                }
+                await emsFeedbackController.test(rule);
+            }
+
+            room.send("adminEmsCommandResult", {
+                requestId: command.requestId,
+                success: true,
+                message: command.action === "disconnect" ? "设备已断开" : "事件已执行",
+            });
+        } catch (error) {
+            room.send("adminEmsCommandResult", {
+                requestId: command.requestId,
+                success: false,
+                message: error instanceof Error ? error.message : "设备操作失败",
+            });
+        } finally {
+            this.reportEmsDeviceState();
+        }
+    }
+
     reportEmsBattery(batteryLevel: number) {
         const normalizedLevel = this.normalizeEmsBatteryForReport(batteryLevel);
         if (!this.room) {
@@ -666,6 +722,7 @@ export class BombermanScene extends Phaser.Scene {
 
         this.lastReportedEmsBattery = normalizedLevel;
         this.room.send("updateEmsBattery", normalizedLevel);
+        this.reportEmsDeviceState();
         const status = this.emsPanel?.querySelector<HTMLElement>("[data-role='ems-status']");
         if (status) {
             status.textContent = `${emsFeedbackController.status} · ${this.formatEmsBattery(normalizedLevel)}`;
@@ -1185,6 +1242,9 @@ export class BombermanScene extends Phaser.Scene {
         room.onMessage("ratingChanged", (message: RatingChangedMessage) => {
             this.ratingChanges = message.changes;
             this.renderResultPanel();
+        });
+        room.onMessage("adminEmsCommand", (command: AdminEmsCommand) => {
+            void this.handleAdminEmsCommand(room, command);
         });
 
         room.onError((_code, message) => {

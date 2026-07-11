@@ -192,6 +192,7 @@ class EmsFeedbackController {
             }
             device.bluetoothDevice.gatt?.disconnect();
         }
+        this.setStatus("未连接");
     }
 
     saveConfig(config: EmsFeedbackConfig) {

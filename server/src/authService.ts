@@ -13,6 +13,7 @@ export type AuthUserDto = {
   roleId: string | null;
   characterKey: string | null;
   currentScore: number;
+  isAdmin: boolean;
 };
 
 export type AuthRoomUser = {
@@ -154,7 +155,16 @@ export function serializeUser(user: User): AuthUserDto {
     roleId: user.roleId,
     characterKey: user.characterKey,
     currentScore: user.currentScore,
+    isAdmin: isAdminUsername(user.username),
   };
+}
+
+export function isAdminUsername(username: string) {
+  const admins = String(process.env.ADMIN_USERNAMES ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return admins.includes(username.trim().toLowerCase());
 }
 
 function ensureDatabaseReady() {

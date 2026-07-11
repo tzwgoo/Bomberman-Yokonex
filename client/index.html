@@ -1434,6 +1434,87 @@
             pointer-events: auto;
             z-index: 21;
         }
+        .admin-device-panel {
+            position: fixed;
+            inset: 64px 0 0;
+            z-index: 18;
+            overflow: auto;
+            padding: 28px 18px 44px;
+            color: var(--ink);
+            background: rgba(14, 20, 27, 0.96);
+        }
+        .admin-device-shell {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 16px;
+        }
+        .admin-device-shell > header,
+        .admin-device-section {
+            padding: 18px;
+            background: rgba(19, 29, 39, 0.94);
+            border-radius: 10px;
+            box-shadow: 0 0 0 1px var(--line), var(--shadow);
+        }
+        .admin-device-shell > header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .admin-device-shell > header p { color: var(--blue); font-size: 12px; font-weight: 800; }
+        .admin-device-shell h2 { font-size: 28px; }
+        .admin-device-shell h3 { margin-bottom: 12px; }
+        .admin-device-header-actions,
+        .admin-device-commands { display: flex; flex-wrap: wrap; gap: 8px; }
+        .admin-device-shell button {
+            cursor: pointer;
+            min-height: 38px;
+            padding: 8px 12px;
+            border: 0;
+            border-radius: 8px;
+            color: #101820;
+            background: var(--gold);
+            font-weight: 800;
+        }
+        .admin-device-shell button.secondary { color: var(--ink); background: #2c3e50; }
+        .admin-device-shell button.danger { color: #fff; background: var(--danger); }
+        .admin-device-shell button:disabled { cursor: default; opacity: 0.42; }
+        .admin-device-message { min-height: 22px; color: var(--gold); font-size: 13px; }
+        .admin-device-message.is-error { color: #ff8f8f; }
+        .admin-device-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 12px;
+        }
+        .admin-device-card {
+            display: grid;
+            gap: 12px;
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(7, 12, 18, 0.62);
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.1);
+        }
+        .admin-device-card.is-connected { box-shadow: 0 0 0 1px rgba(99, 210, 255, 0.58); }
+        .admin-device-card > header { display: flex; justify-content: space-between; gap: 10px; }
+        .admin-device-card header div { display: grid; gap: 4px; }
+        .admin-device-card header span,
+        .admin-device-meta { color: var(--muted); font-size: 12px; }
+        .admin-device-card header i { color: var(--gold); font-style: normal; }
+        .admin-device-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+        .admin-device-logs { display: grid; gap: 6px; max-height: 360px; overflow: auto; }
+        .admin-device-log {
+            display: grid;
+            grid-template-columns: 170px minmax(180px, 0.8fr) minmax(260px, 1.4fr);
+            gap: 10px;
+            padding: 9px 10px;
+            color: var(--muted);
+            font-size: 12px;
+            background: rgba(7, 12, 18, 0.5);
+            border-radius: 6px;
+        }
+        .admin-device-log strong { color: var(--ink); }
+
         @media (max-width: 1180px) {
             .lobby-panel { padding-inline: 14px; }
         }
@@ -1446,6 +1527,7 @@
             .lobby-panel { top: 56px; padding-top: 18px; }
             .profile-panel { top: 56px; padding-top: 18px; }
             .leaderboard-panel { top: 56px; padding-top: 18px; }
+            .admin-device-panel { top: 56px; padding-top: 18px; }
             .auth-panel { top: 56px; padding-top: 24px; }
             .profile-shell { grid-template-columns: 1fr; }
             .profile-header { align-items: flex-start; }
@@ -1474,12 +1556,17 @@
             .map-preview { width: 86px; }
             .player-actions { width: 100%; margin-left: 0; }
             .player-actions button { flex: 1; }
+            .admin-device-shell > header { align-items: stretch; flex-direction: column; }
+            .admin-device-header-actions button { flex: 1; }
+            .admin-device-log { grid-template-columns: 1fr; gap: 4px; }
         }
         @media (max-width: 520px) {
             .lobby-panel,
             .profile-panel {
                 padding-inline: 10px;
             }
+            .admin-device-panel { padding-inline: 10px; }
+            .admin-device-list { grid-template-columns: 1fr; }
             .lobby-panel h2,
             .profile-header h2 {
                 font-size: 26px;
