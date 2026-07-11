@@ -86,3 +86,23 @@ CREATE TABLE IF NOT EXISTS `rating_changes` (
     FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
     ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- EMS 在线设备连接、管理员命令和客户端执行结果日志。
+CREATE TABLE IF NOT EXISTS `ems_device_logs` (
+  `id` VARCHAR(191) NOT NULL,
+  `user_id` VARCHAR(191) NOT NULL,
+  `admin_user_id` VARCHAR(191) NULL,
+  `room_id` VARCHAR(191) NULL,
+  `category` VARCHAR(191) NOT NULL,
+  `action` VARCHAR(191) NOT NULL,
+  `transport` VARCHAR(191) NULL,
+  `status` VARCHAR(191) NULL,
+  `success` BOOLEAN NULL,
+  `message` VARCHAR(191) NULL,
+  `detail` JSON NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `ems_device_logs_user_id_created_at_idx` (`user_id`, `created_at`),
+  KEY `ems_device_logs_admin_user_id_created_at_idx` (`admin_user_id`, `created_at`),
+  KEY `ems_device_logs_category_created_at_idx` (`category`, `created_at`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
