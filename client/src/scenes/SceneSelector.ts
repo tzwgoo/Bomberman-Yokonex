@@ -18,7 +18,7 @@ export class SceneSelector extends Phaser.Scene {
         { title: "个人信息", detail: "查看昵称、积分和战绩", action: "profile" },
         { title: "积分排行", detail: "查看段位和排行榜", action: "leaderboard" },
         { title: "退出登录", detail: "清除当前账号登录状态", action: "logout" },
-        { title: "设备连接", detail: "绑定震动反馈硬件", action: "device" },
+        { title: "设备连接", detail: "连接EMS设备", action: "device" },
     ];
 
     deviceModal?: HTMLElement;
@@ -171,6 +171,8 @@ export class SceneSelector extends Phaser.Scene {
 
     showDeviceModal() {
         this.destroyDeviceModal();
+        // 弹窗打开期间直接停用 Phaser 输入，避免窗口级 pointerup 继续触发底层菜单卡片。
+        this.input.enabled = false;
         const connection = emsFeedbackController.config.connection;
         const modal = document.createElement("section");
         modal.className = "device-modal";
@@ -190,25 +192,20 @@ export class SceneSelector extends Phaser.Scene {
                         <option value="command_websocket" ${connection.transport === "command_websocket" ? "selected" : ""}>YYC-DJ 指令 WebSocket</option>
                     </select>
                 </label>
-                <small>BLE 支持现有 EMS 与 DG-LAB 郊狼 2.0 / 3.0。</small>
                 <label data-role="websocket-field">WebSocket 服务地址
                     <input data-role="websocket-url" value="${escapeHtml(connection.websocketUrl)}" placeholder="wss://ws.example.com" />
-                    <small>需先部署官方 dglab-websocket-simple v2 服务。</small>
                 </label>
                 <div class="device-command-fields" data-role="command-websocket-field">
-                    <small>固定服务地址：<code>ws://103.236.55.92:43001</code></small>
                     <label>UID
                         <input data-role="command-uid" value="${escapeHtml(connection.commandUid)}" placeholder="123456 或 game_123456" />
                     </label>
                     <label>Token
                         <input type="password" data-role="command-token" value="${escapeHtml(connection.commandToken)}" autocomplete="off" />
                     </label>
-                    <small>连接后先登录 IM，再按事件发送对应 commandId。</small>
                 </div>
                 <p class="device-status" data-role="device-status"></p>
                 <div class="device-pairing" data-role="device-pairing" hidden>
                     <img alt="DG-LAB APP 配对二维码" />
-                    <span>使用 DG-LAB APP 的 SOCKET 功能扫码绑定。</span>
                     <code></code>
                 </div>
                 <button data-action="device-connect">连接脉冲主机</button>
@@ -288,6 +285,7 @@ export class SceneSelector extends Phaser.Scene {
         this.deviceModal?.remove();
         this.deviceModal = undefined;
         document.body.classList.remove("device-modal-open");
+        this.input.enabled = true;
         emsFeedbackController.onBatteryChange = undefined;
         emsFeedbackController.onStatusChange = undefined;
     }
