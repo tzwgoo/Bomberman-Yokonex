@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import QRCode from "qrcode";
 
 import { clearAuthState, isLoggedIn, loadAuthState } from "../authStore";
 import { emsFeedbackController } from "../emsFeedback";
@@ -20,7 +21,7 @@ export class SceneSelector extends Phaser.Scene {
         { title: "设备连接", detail: "绑定震动反馈硬件", action: "device" },
     ];
 
-    modalLayer?: Phaser.GameObjects.Container;
+    deviceModal?: HTMLElement;
 
     constructor() {
         super({ key: "selector" });
@@ -31,6 +32,8 @@ export class SceneSelector extends Phaser.Scene {
             this.redirectToAuth();
             return;
         }
+
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroyDeviceModal());
 
         const sceneKey = window.location.hash.substring(1);
         // 只允许正式入口直达，旧调试场景不再作为外部入口开放。
@@ -163,81 +166,125 @@ export class SceneSelector extends Phaser.Scene {
     }
 
     showDeviceModal() {
-        this.modalLayer?.destroy();
+        this.destroyDeviceModal();
+        const connection = emsFeedbackController.config.connection;
+        const modal = document.createElement("section");
+        modal.className = "device-modal";
+        modal.innerHTML = `
+            <div class="device-card">
+                <header>
+                    <div>
+                        <p>EMS</p>
+                        <h2>设备反馈连接</h2>
+                    </div>
+                    <button class="secondary" data-action="device-close">关闭</button>
+                </header>
+                <label>连接方式
+                    <select data-role="device-transport">
+                        <option value="ble" ${connection.transport === "ble" ? "selected" : ""}>BLE 直连</option>
+                        <option value="websocket" ${connection.transport === "websocket" ? "selected" : ""}>DG-LAB WebSocket（仅 3.0）</option>
+                        <option value="command_websocket" ${connection.transport === "command_websocket" ? "selected" : ""}>YYC-DJ 指令 WebSocket</option>
+                    </select>
+                </label>
+                <small>BLE 支持现有 EMS 与 DG-LAB 郊狼 2.0 / 3.0。</small>
+                <label data-role="websocket-field">WebSocket 服务地址
+                    <input data-role="websocket-url" value="${escapeHtml(connection.websocketUrl)}" placeholder="wss://ws.example.com" />
+                    <small>需先部署官方 dglab-websocket-simple v2 服务。</small>
+                </label>
+                <div class="device-command-fields" data-role="command-websocket-field">
+                    <label>指令 WebSocket 地址
+                        <input data-role="command-websocket-url" value="${escapeHtml(connection.commandWebsocketUrl)}" placeholder="ws://103.236.55.92:43001" />
+                    </label>
+                    <label>UID
+                        <input data-role="command-uid" value="${escapeHtml(connection.commandUid)}" placeholder="123456 或 game_123456" />
+                    </label>
+                    <label>Token
+                        <input type="password" data-role="command-token" value="${escapeHtml(connection.commandToken)}" autocomplete="off" />
+                    </label>
+                    <small>连接后先登录 IM，再按事件发送对应 commandId。</small>
+                </div>
+                <p class="device-status" data-role="device-status"></p>
+                <div class="device-pairing" data-role="device-pairing" hidden>
+                    <img alt="DG-LAB APP 配对二维码" />
+                    <span>使用 DG-LAB APP 的 SOCKET 功能扫码绑定。</span>
+                    <code></code>
+                </div>
+                <button data-action="device-connect">连接脉冲主机</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        this.deviceModal = modal;
 
-        const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.52);
-        const panel = this.add.rectangle(400, 306, 430, 238, 0x131d27, 0.98)
-            .setStrokeStyle(1, 0xf6c453, 0.7);
-
-        const heading = this.add.text(400, 222, "设备连接", {
-            color: "#fff5d6",
-            fontFamily: "Microsoft YaHei",
-            fontSize: "26px",
-            fontStyle: "bold",
-        }).setOrigin(0.5);
-
-        const statusText = this.add.text(400, 272, this.deviceStatusText(), {
-            color: "#9fb4c8",
-            fontFamily: "Microsoft YaHei",
-            fontSize: "17px",
-            align: "center",
-        }).setOrigin(0.5);
-
-        const connectBg = this.add.rectangle(332, 356, 132, 42, 0xf6c453)
-            .setInteractive({ useHandCursor: true });
-        const connectText = this.add.text(332, 356, "连接EMS", {
-            color: "#101820",
-            fontFamily: "Microsoft YaHei",
-            fontSize: "17px",
-            fontStyle: "bold",
-        }).setOrigin(0.5);
-
-        const closeBg = this.add.rectangle(468, 356, 112, 42, 0x2c3e50)
-            .setInteractive({ useHandCursor: true });
-        const closeText = this.add.text(468, 356, "关闭", {
-            color: "#fff5d6",
-            fontFamily: "Microsoft YaHei",
-            fontSize: "17px",
-            fontStyle: "bold",
-        }).setOrigin(0.5);
-
-        this.modalLayer = this.add.container(0, 0, [overlay, panel, heading, statusText, connectBg, connectText, closeBg, closeText]);
-
-        const updateBatteryStatus = () => {
-            statusText.setText(this.deviceStatusText());
+        const transport = modal.querySelector<HTMLSelectElement>("[data-role='device-transport']")!;
+        const websocketField = modal.querySelector<HTMLElement>("[data-role='websocket-field']")!;
+        const websocketUrl = modal.querySelector<HTMLInputElement>("[data-role='websocket-url']")!;
+        const commandWebsocketField = modal.querySelector<HTMLElement>("[data-role='command-websocket-field']")!;
+        const commandWebsocketUrl = modal.querySelector<HTMLInputElement>("[data-role='command-websocket-url']")!;
+        const commandUid = modal.querySelector<HTMLInputElement>("[data-role='command-uid']")!;
+        const commandToken = modal.querySelector<HTMLInputElement>("[data-role='command-token']")!;
+        const status = modal.querySelector<HTMLElement>("[data-role='device-status']")!;
+        const pairing = modal.querySelector<HTMLElement>("[data-role='device-pairing']")!;
+        const updateMode = () => {
+            websocketField.hidden = transport.value !== "websocket";
+            commandWebsocketField.hidden = transport.value !== "command_websocket";
         };
-
-        const close = () => {
-            soundManager.play("button");
-            if (emsFeedbackController.onBatteryChange === updateBatteryStatus) {
-                emsFeedbackController.onBatteryChange = undefined;
+        const updateStatus = () => status.textContent = this.deviceStatusText();
+        const updatePairing = async () => {
+            const pairingUrl = emsFeedbackController.pairingUrl;
+            pairing.hidden = !pairingUrl;
+            if (!pairingUrl || this.deviceModal !== modal) {
+                return;
             }
-            this.modalLayer?.destroy();
-            this.modalLayer = undefined;
+            pairing.querySelector<HTMLImageElement>("img")!.src = await QRCode.toDataURL(pairingUrl, { width: 190, margin: 1 });
+            pairing.querySelector<HTMLElement>("code")!.textContent = pairingUrl;
         };
 
-        // 首页只负责设备连接；事件规则和强度上限仍在对战大厅的 EMS 反馈里配置。
-        emsFeedbackController.onBatteryChange = updateBatteryStatus;
+        // 首页负责选择连接方式和完成配对；事件强度仍在对战大厅中配置。
+        emsFeedbackController.onBatteryChange = updateStatus;
+        emsFeedbackController.onStatusChange = () => {
+            updateStatus();
+            void updatePairing();
+        };
+        updateMode();
+        updateStatus();
+        void updatePairing();
 
-        overlay.setInteractive().on("pointerdown", close);
-        connectBg.on("pointerdown", () => {
-            connectBg.setScale(0.96);
-        });
-        connectBg.on("pointerup", async () => {
-            connectBg.setScale(1);
+        modal.addEventListener("click", async (event) => {
+            const action = (event.target as HTMLElement).closest<HTMLElement>("[data-action]")?.dataset.action;
+            if (action === "device-close") {
+                soundManager.play("button");
+                this.destroyDeviceModal();
+                return;
+            }
+            if (action !== "device-connect") {
+                return;
+            }
             soundManager.play("button");
-            statusText.setText("正在连接 EMS...");
+            status.textContent = "正在连接...";
             try {
-                await emsFeedbackController.connect();
-                statusText.setText(this.deviceStatusText());
+                await emsFeedbackController.connect({
+                    transport: transport.value === "websocket"
+                        ? "websocket"
+                        : transport.value === "command_websocket" ? "command_websocket" : "ble",
+                    websocketUrl: websocketUrl.value.trim(),
+                    commandWebsocketUrl: commandWebsocketUrl.value.trim(),
+                    commandUid: commandUid.value.trim(),
+                    commandToken: commandToken.value.trim(),
+                });
+                updateStatus();
+                await updatePairing();
             } catch (error) {
-                statusText.setText(error instanceof Error ? error.message : "EMS连接失败");
+                status.textContent = error instanceof Error ? error.message : "设备连接失败";
             }
         });
-        closeBg.on("pointerdown", () => {
-            closeBg.setScale(0.96);
-        });
-        closeBg.on("pointerup", close);
+        transport.addEventListener("change", updateMode);
+    }
+
+    destroyDeviceModal() {
+        this.deviceModal?.remove();
+        this.deviceModal = undefined;
+        emsFeedbackController.onBatteryChange = undefined;
+        emsFeedbackController.onStatusChange = undefined;
     }
 
     deviceStatusText() {
@@ -271,4 +318,14 @@ export class SceneSelector extends Phaser.Scene {
 
         item.detail = state ? `${state.user.nickname} · 点击退出` : "清除当前账号登录状态";
     }
+}
+
+function escapeHtml(value: string) {
+    return value.replace(/[&<>'"]/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+    })[character]!);
 }

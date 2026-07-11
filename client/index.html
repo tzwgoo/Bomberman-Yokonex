@@ -256,7 +256,8 @@
             grid-template-columns: repeat(3, minmax(74px, 1fr));
             gap: 8px;
         }
-        .ems-rule input[type="number"] {
+        .ems-rule input[type="number"],
+        .ems-rule input[type="text"] {
             width: 100%;
             margin-top: 5px;
             color: var(--ink);
@@ -265,6 +266,7 @@
             border-radius: 8px;
             padding: 8px;
         }
+        .ems-rule-grid .ems-command-id { grid-column: 1 / -1; }
         .ems-card button {
             cursor: pointer;
             color: #101820;
@@ -283,6 +285,104 @@
             box-shadow: none;
         }
         .ems-card button:active { transform: scale(0.96); }
+        .device-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: grid;
+            place-items: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.66);
+        }
+        .device-card {
+            width: min(520px, 100%);
+            max-height: calc(100vh - 40px);
+            overflow: auto;
+            display: grid;
+            gap: 14px;
+            padding: 22px;
+            color: var(--ink);
+            background: #131d27;
+            border-radius: 12px;
+            box-shadow: 0 0 0 1px rgba(246, 196, 83, 0.7), var(--shadow);
+        }
+        .device-card header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .device-card h2 { font-size: 26px; }
+        .device-card p:first-child {
+            margin-bottom: 4px;
+            color: var(--blue);
+            font-size: 13px;
+            font-weight: 800;
+        }
+        .device-card label {
+            display: grid;
+            gap: 7px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .device-command-fields {
+            display: grid;
+            gap: 12px;
+        }
+        .device-command-fields[hidden] { display: none; }
+        .device-card input,
+        .device-card select {
+            width: 100%;
+            padding: 10px;
+            color: var(--ink);
+            background: rgba(7, 12, 18, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 8px;
+        }
+        .device-card small,
+        .device-pairing span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .device-card button {
+            cursor: pointer;
+            padding: 10px 14px;
+            color: #101820;
+            font-weight: 800;
+            background: var(--gold);
+            border: 0;
+            border-radius: 8px;
+        }
+        .device-card button.secondary {
+            color: var(--ink);
+            background: #2c3e50;
+        }
+        .device-status {
+            min-height: 20px;
+            color: var(--gold);
+            font-size: 14px;
+        }
+        .device-pairing {
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(7, 12, 18, 0.52);
+            border-radius: 8px;
+        }
+        .device-pairing[hidden],
+        .device-card [hidden] { display: none; }
+        .device-pairing img {
+            width: 190px;
+            height: 190px;
+            background: #fff;
+        }
+        .device-pairing code {
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            color: var(--blue);
+            font-size: 11px;
+        }
         .lobby-section-title {
             display: flex;
             justify-content: space-between;

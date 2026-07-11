@@ -439,9 +439,9 @@ export class BombermanScene extends Phaser.Scene {
                     </label>
                     <label class="ems-limit">
                         强度上限
-                        <input type="number" min="0" max="180" data-role="ems-max-strength" value="${config.maxStrength}" />
+                        <input type="number" min="0" max="200" data-role="ems-max-strength" value="${config.maxStrength}" />
                     </label>
-                    <button data-action="ems-connect">连接EMS</button>
+                    <button data-action="ems-connect">连接DG-LAB</button>
                     <span data-role="ems-status">${emsFeedbackController.status}</span>
                 </div>
                 <div class="ems-rule-list">
@@ -467,13 +467,16 @@ export class BombermanScene extends Phaser.Scene {
                 </div>
                 <div class="ems-rule-grid">
                     <label>A
-                        <input type="number" min="0" max="180" data-field="channelA" value="${rule.channelA}" />
+                        <input type="number" min="0" max="200" data-field="channelA" value="${rule.channelA}" />
                     </label>
                     <label>B
-                        <input type="number" min="0" max="180" data-field="channelB" value="${rule.channelB}" />
+                        <input type="number" min="0" max="200" data-field="channelB" value="${rule.channelB}" />
                     </label>
                     <label>毫秒
                         <input type="number" min="1" max="5000" data-field="durationMs" value="${rule.durationMs}" />
+                    </label>
+                    <label class="ems-command-id">commandId
+                        <input type="text" data-field="commandId" value="${escapeHtmlAttribute(rule.commandId)}" placeholder="${rule.eventType}" />
                     </label>
                 </div>
             </section>
@@ -513,6 +516,10 @@ export class BombermanScene extends Phaser.Scene {
     }
 
     async connectEmsDevice() {
+        if (emsFeedbackController.config.connection.transport !== "ble") {
+            this.setEmsStatus("请在首页“设备连接”中完成 WebSocket 配置");
+            return;
+        }
         this.setEmsStatus("正在连接...");
         try {
             await emsFeedbackController.connect();
@@ -554,6 +561,7 @@ export class BombermanScene extends Phaser.Scene {
             const ruleEl = this.emsPanel!.querySelector<HTMLElement>(`[data-rule='${eventType}']`)!;
             return {
                 eventType: eventType as EmsFeedbackEventType,
+                commandId: ruleEl.querySelector<HTMLInputElement>("[data-field='commandId']")?.value.trim() || eventType,
                 enabled: Boolean(ruleEl.querySelector<HTMLInputElement>("[data-field='enabled']")?.checked),
                 action: "fixed" as const,
                 channelA: Number(ruleEl.querySelector<HTMLInputElement>("[data-field='channelA']")?.value ?? 0),
@@ -563,7 +571,7 @@ export class BombermanScene extends Phaser.Scene {
             };
         });
 
-        return { enabled, maxStrength, rules };
+        return { enabled, maxStrength, connection: emsFeedbackController.config.connection, rules };
     }
 
     setEmsStatus(message: string) {
@@ -1972,4 +1980,14 @@ export class BombermanScene extends Phaser.Scene {
 
         this.recordedMatchRoomId = this.room.roomId;
     }
+}
+
+function escapeHtmlAttribute(value: string) {
+    return value.replace(/[&<>'"]/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+    })[character]!);
 }
