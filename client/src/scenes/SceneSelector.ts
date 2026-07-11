@@ -224,12 +224,14 @@ export class SceneSelector extends Phaser.Scene {
         };
         const updateStatus = () => status.textContent = this.deviceStatusText();
         const updatePairing = async () => {
-            const pairingUrl = emsFeedbackController.pairingUrl;
+            const pairingUrl = transport.value === "websocket" ? emsFeedbackController.pairingUrl : "";
+            const pairingImage = pairing.querySelector<HTMLImageElement>("img")!;
             pairing.hidden = !pairingUrl;
             if (!pairingUrl || this.deviceModal !== modal) {
+                pairingImage.removeAttribute("src");
                 return;
             }
-            pairing.querySelector<HTMLImageElement>("img")!.src = await QRCode.toDataURL(pairingUrl, { width: 190, margin: 1 });
+            pairingImage.src = await QRCode.toDataURL(pairingUrl, { width: 190, margin: 1 });
         };
 
         // 首页负责选择连接方式和完成配对；事件强度仍在对战大厅中配置。
@@ -272,7 +274,10 @@ export class SceneSelector extends Phaser.Scene {
         });
         modal.addEventListener("pointerdown", (event) => event.stopPropagation());
         modal.addEventListener("pointerup", (event) => event.stopPropagation());
-        transport.addEventListener("change", updateMode);
+        transport.addEventListener("change", () => {
+            updateMode();
+            void updatePairing();
+        });
     }
 
     destroyDeviceModal() {
