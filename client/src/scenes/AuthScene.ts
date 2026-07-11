@@ -41,7 +41,7 @@ export class AuthScene extends Phaser.Scene {
         panel.className = "auth-panel";
         panel.innerHTML = `
             <form class="auth-card">
-                <p>YOKONEX ACCOUNT</p>
+                <p>BOMBERMAN ACCOUNT</p>
                 <h2>${isRegister ? "注册账号" : "账号登录"}</h2>
                 <label for="auth-username">用户名</label>
                 <input id="auth-username" name="username" type="text" autocomplete="username" maxlength="24" placeholder="3-24 位字母数字下划线" />

@@ -226,7 +226,7 @@ export class BombermanScene extends Phaser.Scene {
             <div class="lobby-shell">
                 <header class="lobby-header">
                     <div>
-                        <p>YOKONEX</p>
+                    <p>BOMBERMAN</p>
                         <h2>多人对战大厅</h2>
                     </div>
                     <button class="secondary" data-action="ems-config">EMS反馈</button>

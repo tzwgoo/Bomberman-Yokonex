@@ -66,7 +66,7 @@ export class SceneSelector extends Phaser.Scene {
     }
 
     drawHeader() {
-        this.add.text(56, 58, "YOKONEX", {
+        this.add.text(56, 58, "BOMBERMAN", {
             color: "#63d2ff",
             fontFamily: "Verdana",
             fontSize: "18px",

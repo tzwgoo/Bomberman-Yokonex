@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Bomberman Yokonex</string>
-    <string name="title_activity_main">Bomberman Yokonex</string>
+    <string name="app_name">Bomberman</string>
+    <string name="title_activity_main">Bomberman</string>
     <string name="package_name">com.yokonex.bomberman</string>
     <string name="custom_url_scheme">com.yokonex.bomberman</string>
 </resources>
