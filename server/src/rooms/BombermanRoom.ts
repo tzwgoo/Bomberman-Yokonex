@@ -26,7 +26,13 @@ export interface BombermanJoinOptions {
   token?: string;
 }
 
-type PowerUpType = "bomb" | "range" | "speed" | "shield";
+type PowerUpType = "bomb" | "range" | "speed" | "shield" | "ems_low" | "ems_medium" | "ems_high";
+
+type FixedStrengthPowerUp = {
+  strength: number;
+  durationMs: number;
+  commandId: string;
+};
 
 type PlayerRolePreset = {
   id: string;
@@ -40,6 +46,15 @@ const POWER_UP_LABELS: Record<PowerUpType, string> = {
   range: "爆炸范围",
   speed: "移动速度",
   shield: "能量护盾",
+  ems_low: "低强度脉冲",
+  ems_medium: "中强度脉冲",
+  ems_high: "高强度脉冲",
+};
+
+const FIXED_STRENGTH_POWER_UPS: Partial<Record<PowerUpType, FixedStrengthPowerUp>> = {
+  ems_low: { strength: 40, durationMs: 800, commandId: "power_up_ems_low" },
+  ems_medium: { strength: 80, durationMs: 800, commandId: "power_up_ems_medium" },
+  ems_high: { strength: 120, durationMs: 800, commandId: "power_up_ems_high" },
 };
 
 const PLAYER_ROLES: PlayerRolePreset[] = [
@@ -146,7 +161,7 @@ const ROUND_DURATION_MS = 120000;
 const ROUND_INTRO_MS = 3000;
 const TARGET_SCORE = 3;
 const START_COUNTDOWN_MS = 3000;
-const POWER_UP_TYPES: PowerUpType[] = ["bomb", "range", "speed", "shield"];
+const POWER_UP_TYPES: PowerUpType[] = ["bomb", "range", "speed", "shield", "ems_low", "ems_medium", "ems_high"];
 
 export class BombermanRoom extends Room {
   maxClients = 4;
@@ -632,13 +647,31 @@ export class BombermanRoom extends Room {
       player.shield = true;
     }
 
+    const powerUpType = powerUp.type as PowerUpType;
+    const fixedStrengthEffect = FIXED_STRENGTH_POWER_UPS[powerUpType];
     this.state.powerUps.delete(key);
     this.broadcast("powerUpCollected", {
       sessionId,
       nickname: player.nickname,
-      type: powerUp.type,
-      label: POWER_UP_LABELS[powerUp.type as PowerUpType],
+      type: powerUpType,
+      label: POWER_UP_LABELS[powerUpType],
+      affectsOtherDevices: Boolean(fixedStrengthEffect),
     });
+
+    if (fixedStrengthEffect) {
+      // 固定强度道具只通知其他玩家，拾取者不会收到设备触发消息。
+      this.clients.forEach((client) => {
+        if (client.sessionId !== sessionId) {
+          client.send("fixedStrengthPowerUp", {
+            pickerSessionId: sessionId,
+            nickname: player.nickname,
+            type: powerUpType,
+            label: POWER_UP_LABELS[powerUpType],
+            ...fixedStrengthEffect,
+          });
+        }
+      });
+    }
   }
 
   powerUpTypeAt(seed: number) {

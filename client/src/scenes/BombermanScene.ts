@@ -39,6 +39,17 @@ type PowerUpCollectedMessage = {
     nickname: string;
     type: string;
     label: string;
+    affectsOtherDevices: boolean;
+};
+
+type FixedStrengthPowerUpMessage = {
+    pickerSessionId: string;
+    nickname: string;
+    type: string;
+    label: string;
+    strength: number;
+    durationMs: number;
+    commandId: string;
 };
 
 type RatingChangedMessage = {
@@ -1238,9 +1249,17 @@ export class BombermanScene extends Phaser.Scene {
             soundManager.play("powerup");
             this.showPowerUpToast(`${message.nickname} 获得 ${message.label}`);
             this.showCombatFeedback(`获得 ${message.label}`, 0x63d2ff);
-            if (message.sessionId === room.sessionId) {
+            if (message.sessionId === room.sessionId && !message.affectsOtherDevices) {
                 this.triggerEmsFeedback("power_up");
             }
+        });
+        room.onMessage("fixedStrengthPowerUp", (message: FixedStrengthPowerUpMessage) => {
+            // 服务端不会向拾取者下发此消息，客户端再校验一次，防止异常消息误触发。
+            if (message.pickerSessionId === room.sessionId) {
+                return;
+            }
+            emsFeedbackController.triggerFixedStrength(message.strength, message.durationMs, message.commandId);
+            this.showCombatFeedback(`${message.nickname} 触发 ${message.label}`, 0xff7a35);
         });
         room.onMessage("ratingChanged", (message: RatingChangedMessage) => {
             this.ratingChanges = message.changes;
@@ -2088,6 +2107,18 @@ export class BombermanScene extends Phaser.Scene {
 
         if (type === "speed") {
             return "⚡";
+        }
+
+        if (type === "ems_low") {
+            return "➖";
+        }
+
+        if (type === "ems_medium") {
+            return "〰️";
+        }
+
+        if (type === "ems_high") {
+            return "‼️";
         }
 
         return "🛡️";

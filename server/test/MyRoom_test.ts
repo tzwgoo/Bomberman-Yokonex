@@ -307,8 +307,12 @@ describe("bomberman room", () => {
     assert.ok(player);
 
     const collectedMessages: string[] = [];
+    const pickerDeviceMessages: Array<{ strength: number }> = [];
+    const otherDeviceMessages: Array<{ strength: number; durationMs: number; commandId: string }> = [];
     host.onMessage("powerUpCollected", (message) => collectedMessages.push(message.type));
     guest.onMessage("powerUpCollected", () => {});
+    host.onMessage("fixedStrengthPowerUp", (message) => pickerDeviceMessages.push(message));
+    guest.onMessage("fixedStrengthPowerUp", (message) => otherDeviceMessages.push(message));
 
     const playerTile = room.worldToTile(player.x, player.y);
     let tick = 1;
@@ -341,8 +345,19 @@ describe("bomberman room", () => {
     assert.ok(player.speed > 2);
     await collect("shield");
     assert.strictEqual(player.shield, true);
+    await collect("ems_low");
+    await collect("ems_medium");
+    await collect("ems_high");
     assert.strictEqual(room.state.powerUps.size, 0);
-    assert.deepStrictEqual(collectedMessages, ["bomb", "range", "speed", "shield"]);
+    assert.deepStrictEqual(collectedMessages, ["bomb", "range", "speed", "shield", "ems_low", "ems_medium", "ems_high"]);
+    assert.deepStrictEqual(pickerDeviceMessages, []);
+    assert.deepStrictEqual(otherDeviceMessages.map((message) => message.strength), [40, 80, 120]);
+    assert.ok(otherDeviceMessages.every((message) => message.durationMs === 800));
+    assert.deepStrictEqual(otherDeviceMessages.map((message) => message.commandId), [
+      "power_up_ems_low",
+      "power_up_ems_medium",
+      "power_up_ems_high",
+    ]);
   });
 
   it("tracks multi-round score and match winner", async () => {

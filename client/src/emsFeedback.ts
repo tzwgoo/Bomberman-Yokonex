@@ -216,6 +216,31 @@ class EmsFeedbackController {
             .catch((error) => this.setStatus(error instanceof Error ? error.message : "设备触发失败"));
     }
 
+    triggerFixedStrength(strength: number, durationMs: number, commandId: string) {
+        if (!this.config.enabled || !this.isReady()) {
+            return;
+        }
+
+        const fixedStrength = normalizeStrength(strength);
+        const fixedDurationMs = normalizeDuration(durationMs);
+        const rule: EmsFeedbackRule = {
+            eventType: "power_up",
+            commandId,
+            enabled: true,
+            action: "fixed",
+            channelA: fixedStrength,
+            channelB: fixedStrength,
+            durationMs: fixedDurationMs,
+            steps: [],
+        };
+
+        // 服务端决定道具档位，本机仍按用户设置的强度上限做最后一道保护。
+        this.playQueue = this.playQueue
+            .catch(() => undefined)
+            .then(() => this.playRule(rule))
+            .catch((error) => this.setStatus(error instanceof Error ? error.message : "固定强度道具触发失败"));
+    }
+
     async test(rule: EmsFeedbackRule) {
         if (!this.isReady()) {
             await this.connect();

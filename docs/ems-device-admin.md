@@ -72,7 +72,7 @@ sudo systemctl reload nginx
 4. 在在线玩家卡片中发送事件或断开设备。
 5. 在最近日志中检查命令是否下发，以及客户端是否执行成功。
 
-六类事件映射见 [commandId 与游戏事件映射](command-id-event-mapping.md)。
+九类事件映射见 [commandId 与游戏事件映射](command-id-event-mapping.md)。
 
 ## 6. 安全限制
 
